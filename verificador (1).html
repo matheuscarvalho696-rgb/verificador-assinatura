@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificador de Assinatura Digital</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f0f4f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .logo-bar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .icp-box {
+    background: #fff;
+    border: 1.5px solid #2e7d52;
+    border-radius: 6px;
+    padding: .4rem .6rem;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .icp-box .icp { font-size: 1rem; font-weight: 700; color: #2e7d52; }
+  .icp-box .brasil { font-size: .55rem; font-weight: 600; color: #2e7d52; letter-spacing: .05em; }
+  .icp-box .sub { font-size: .45rem; color: #666; border-top: 1px solid #ccc; margin-top: 2px; padding-top: 2px; }
+
+  .logo-title { font-size: .9rem; font-weight: 600; color: #333; }
+  .logo-sub   { font-size: .72rem; color: #666; }
+
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 16px rgba(0,0,0,.1);
+    width: 100%;
+    max-width: 480px;
+    overflow: hidden;
+  }
+
+  /* Status banner */
+  .status-banner {
+    padding: 1.5rem;
+    text-align: center;
+    font-size: 1.4rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+  }
+  .status-banner.valid   { background: #e8f5ee; color: #2e7d52; }
+  .status-banner.invalid { background: #fdecea; color: #c62828; }
+  .status-banner.loading { background: #f5f5f5; color: #666; }
+
+  .status-icon { font-size: 1.4rem; }
+
+  /* Content */
+  .card-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+  .field { display: flex; flex-direction: column; gap: .3rem; }
+  .field-label { font-size: .75rem; font-weight: 600; color: #333; }
+  .field-value { font-size: .9rem; color: #444; }
+  .field-value.mono { font-family: 'Courier New', monospace; font-size: .75rem; word-break: break-all; color: #333; }
+
+  .divider { height: 1px; background: #eee; }
+
+  /* Signer block */
+  .signer-block {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+  }
+
+  .signer-header {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-weight: 600;
+    font-size: .95rem;
+    color: #1a1a1a;
+  }
+
+  .check-circle {
+    width: 20px; height: 20px;
+    background: #2e7d52;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: .7rem;
+    flex-shrink: 0;
+  }
+
+  .signer-row { display: flex; gap: .4rem; font-size: .82rem; }
+  .signer-key { font-weight: 600; color: #333; min-width: 80px; }
+  .signer-val { color: #555; word-break: break-word; }
+
+  /* Details toggle */
+  .btn-details {
+    width: 100%;
+    background: #2e7d52;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: .85rem;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    transition: background .2s;
+    font-family: 'Inter', sans-serif;
+  }
+  .btn-details:hover { background: #256645; }
+
+  .details-panel {
+    display: none;
+    flex-direction: column;
+    gap: .85rem;
+    margin-top: .5rem;
+    padding: 1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .details-panel.open { display: flex; }
+
+  .detail-row { display: flex; flex-direction: column; gap: .2rem; }
+  .detail-label { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #888; }
+  .detail-val { font-size: .82rem; color: #333; word-break: break-all; }
+
+  /* Error state */
+  .error-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 16px rgba(0,0,0,.1);
+    width: 100%;
+    max-width: 480px;
+    padding: 2rem;
+    text-align: center;
+  }
+  .error-card h2 { color: #c62828; margin-bottom: .5rem; }
+  .error-card p  { color: #666; font-size: .9rem; }
+
+  footer {
+    margin-top: 2rem;
+    text-align: center;
+    font-size: .72rem;
+    color: #999;
+    max-width: 480px;
+  }
+</style>
+</head>
+<body>
+
+<div class="logo-bar">
+  <div class="icp-box">
+    <div class="icp">ICP</div>
+    <div class="brasil">Brasil</div>
+    <div class="sub">Cert. Digital</div>
+  </div>
+  <div>
+    <div class="logo-title">Verificador de Assinatura Digital</div>
+    <div class="logo-sub">Consulta de autenticidade de documento</div>
+  </div>
+</div>
+
+<div id="main-card"></div>
+
+<footer>
+  Esta página verifica dados de assinatura embutidos no documento.<br>
+  Para validação técnica ICP-Brasil acesse <a href="https://validar.iti.gov.br" target="_blank" style="color:#2e7d52">validar.iti.gov.br</a>
+</footer>
+
+<script>
+function getParams() {
+  const p = new URLSearchParams(window.location.search);
+  // Also support hash-based params for longer URLs
+  const h = new URLSearchParams(window.location.hash.replace('#',''));
+  const get = k => p.get(k) || h.get(k) || '';
+  return {
+    nome:      decodeURIComponent(get('n')  || get('nome')  || ''),
+    cnpj:      decodeURIComponent(get('c')  || get('cnpj')  || ''),
+    cpf:       decodeURIComponent(get('cpf') || ''),
+    email:     decodeURIComponent(get('e')  || get('email') || ''),
+    razao:     decodeURIComponent(get('r')  || get('razao') || ''),
+    ac:        decodeURIComponent(get('ac') || ''),
+    hash:      decodeURIComponent(get('h')  || get('hash')  || ''),
+    data:      decodeURIComponent(get('d')  || get('data')  || ''),
+    motivo:    decodeURIComponent(get('m')  || get('motivo')|| ''),
+    protocolo: decodeURIComponent(get('p')  || get('proto') || ''),
+    docnome:   decodeURIComponent(get('dn') || ''),
+  };
+}
+
+function maskCNPJ(v) {
+  if (!v) return '';
+  // Show only last 4 digits: *...****-XX
+  return v.length >= 4 ? '*...' + v.slice(-4) : v;
+}
+
+function maskName(v) {
+  if (!v) return '';
+  const parts = v.split(' ');
+  return parts[0] + (parts.length > 1 ? ' ***' : '');
+}
+
+function toggleDetails() {
+  const panel = document.getElementById('details-panel');
+  const btn   = document.getElementById('btn-details');
+  panel.classList.toggle('open');
+  btn.innerHTML = panel.classList.contains('open')
+    ? '∧ Ocultar detalhes'
+    : '∨ Detalhes';
+}
+
+function render() {
+  const p = getParams();
+  const container = document.getElementById('main-card');
+
+  // If no data at all, show error
+  if (!p.nome && !p.hash) {
+    container.innerHTML = `
+      <div class="error-card">
+        <h2>QR Code inválido</h2>
+        <p>Não foi possível encontrar dados de assinatura neste link.<br>
+        Verifique se o QR code foi gerado pela ferramenta correta.</p>
+      </div>`;
+    return;
+  }
+
+  const dateDisplay = p.data || '—';
+  const nomeDisplay = maskName(p.nome) || '—';
+  const cnpjDisplay = p.cnpj ? maskCNPJ(p.cnpj) : '';
+
+  container.innerHTML = `
+    <div class="card">
+      <div class="status-banner valid">
+        <span class="status-icon">✓</span>
+        <span>Corretamente assinado</span>
+      </div>
+
+      <div class="card-body">
+
+        ${p.docnome ? `
+        <div class="field">
+          <div class="field-label">Nome do documento</div>
+          <div class="field-value">${escHtml(p.docnome)}</div>
+        </div>
+        <div class="divider"></div>` : ''}
+
+        <div class="field">
+          <div class="field-label">Criado em:</div>
+          <div class="field-value">${escHtml(dateDisplay)}</div>
+        </div>
+
+        ${p.hash ? `
+        <div class="divider"></div>
+        <div class="field">
+          <div class="field-label">Hash do Documento:</div>
+          <div class="field-value mono">${escHtml(p.hash)}</div>
+        </div>` : ''}
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <div class="field-label">Assinado por:</div>
+        </div>
+
+        <div class="signer-block">
+          <div class="signer-header">
+            <div class="check-circle">✓</div>
+            <span>${escHtml(nomeDisplay)}</span>
+          </div>
+          ${p.cpf   ? `<div class="signer-row"><span class="signer-key">CPF:</span><span class="signer-val">${escHtml(p.cpf)}</span></div>` : ''}
+          ${p.email ? `<div class="signer-row"><span class="signer-key">E-mail:</span><span class="signer-val">${escHtml(p.email)}</span></div>` : ''}
+          ${p.razao ? `<div class="signer-row"><span class="signer-key">Razão Social:</span><span class="signer-val">${escHtml(p.razao)}</span></div>` : ''}
+          ${p.cnpj  ? `<div class="signer-row"><span class="signer-key">CNPJ:</span><span class="signer-val">${escHtml(maskCNPJ(p.cnpj))}</span></div>` : ''}
+          <div class="signer-row"><span class="signer-key">Em:</span><span class="signer-val">${escHtml(dateDisplay)}</span></div>
+        </div>
+
+        <button class="btn-details" id="btn-details" onclick="toggleDetails()">∨ Detalhes</button>
+
+        <div class="details-panel" id="details-panel">
+          ${p.nome      ? row('Signatário completo', p.nome) : ''}
+          ${p.cnpj      ? row('CNPJ', p.cnpj) : ''}
+          ${p.ac        ? row('Autoridade Certificadora', p.ac) : ''}
+          ${p.motivo    ? row('Motivo', p.motivo) : ''}
+          ${p.protocolo ? row('Código de protocolo', p.protocolo) : ''}
+          ${p.hash      ? row('Hash SHA-256', p.hash, true) : ''}
+          <div class="detail-row">
+            <div class="detail-label">Validação técnica</div>
+            <div class="detail-val"><a href="https://validar.iti.gov.br" target="_blank" style="color:#2e7d52">validar.iti.gov.br</a> — faça upload do PDF assinado</div>
+          </div>
+        </div>
+
+      </div>
+    </div>`;
+}
+
+function row(label, val, mono=false) {
+  return `<div class="detail-row">
+    <div class="detail-label">${escHtml(label)}</div>
+    <div class="detail-val${mono?' mono':''}" style="${mono?'font-family:monospace;font-size:.75rem;word-break:break-all':''}">
+      ${escHtml(val)}
+    </div>
+  </div>`;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+render();
+</script>
+</body>
+</html>

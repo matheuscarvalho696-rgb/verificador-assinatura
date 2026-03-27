@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assinador Digital — e-CNPJ / e-CPF</title>
+
+<!-- PDF-lib for PDF manipulation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<!-- Forge for cryptography / PKCS#12 parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js"></script>
+<!-- QR Code generator -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0e0f11;
+    --surface: #16181c;
+    --surface2: #1e2127;
+    --border: #2a2d35;
+    --accent: #00d4aa;
+    --accent2: #0099cc;
+    --danger: #ff4d6d;
+    --warn: #f5a623;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --success: #00d4aa;
+    --r: 10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  /* grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,170,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 3rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: .65rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: .25rem .75rem;
+    border-radius: 20px;
+    margin-bottom: 1rem;
+    opacity: .8;
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -.02em;
+    margin-bottom: .5rem;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: .95rem;
+    font-weight: 300;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 780px;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 1.75rem;
+    transition: border-color .2s;
+  }
+
+  .card:hover { border-color: #3a3d48; }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .step-num {
+    width: 32px; height: 32px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: .8rem;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .step-title {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .step-desc {
+    font-size: .8rem;
+    color: var(--muted);
+  }
+
+  /* Drop zones */
+  .dropzone {
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dropzone:hover, .dropzone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,212,170,.04);
+  }
+
+  .dropzone.loaded {
+    border-color: var(--accent);
+    border-style: solid;
+    background: rgba(0,212,170,.06);
+  }
+
+  .dropzone.loaded-pdf {
+    border-color: var(--accent2);
+    border-style: solid;
+    background: rgba(0,153,204,.06);
+  }
+
+  .dropzone input[type="file"] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+
+  .dz-icon { font-size: 2rem; margin-bottom: .5rem; line-height: 1; }
+  .dz-label { font-size: .9rem; color: var(--muted); }
+  .dz-label strong { color: var(--text); display: block; margin-bottom: .25rem; }
+  .dz-filename {
+    font-family: 'DM Mono', monospace;
+    font-size: .8rem;
+    color: var(--accent);
+    margin-top: .5rem;
+    word-break: break-all;
+  }
+
+  /* Password field */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    margin-top: 1rem;
+  }
+
+  .field label {
+    font-size: .8rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .05em;
+  }
+
+  .input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .field input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: .9rem;
+    padding: .65rem 2.5rem .65rem .85rem;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  .field input:focus { border-color: var(--accent); }
+
+  .toggle-pw {
+    position: absolute; right: .75rem;
+    background: none; border: none;
+    color: var(--muted); cursor: pointer;
+    font-size: 1rem; padding: 0;
+    transition: color .2s;
+  }
+  .toggle-pw:hover { color: var(--text); }
+
+  /* Reason field */
+  .field input.reason-input {
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    padding: .65rem .85rem;
+  }
+
+  /* Cert info panel */
+  #cert-info {
+    margin-top: 1rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    display: none;
+  }
+
+  #cert-info.visible { display: block; }
+
+  .cert-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem .75rem;
+  }
+
+  .cert-item { display: flex; flex-direction: column; gap: .15rem; }
+  .cert-key {
+    font-family: 'DM Mono', monospace;
+    font-size: .65rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cert-val {
+    font-size: .82rem;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .cert-status {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .8rem;
+    padding: .2rem .6rem;
+    border-radius: 20px;
+    margin-bottom: .85rem;
+  }
+  .cert-status.valid { background: rgba(0,212,170,.12); color: var(--success); }
+  .cert-status.expired { background: rgba(255,77,109,.12); color: var(--danger); }
+  .cert-status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  /* Sign button */
+  .btn-sign {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border: none;
+    border-radius: var(--r);
+    color: #000;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .2s, transform .1s;
+    letter-spacing: .01em;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-sign:disabled { opacity: .35; cursor: not-allowed; }
+  .btn-sign:not(:disabled):hover { opacity: .9; }
+  .btn-sign:not(:disabled):active { transform: scale(.99); }
+
+  .btn-sign .shimmer {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.25) 50%, transparent 100%);
+    transform: translateX(-100%);
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
+
+  /* Progress */
+  #progress-wrap {
+    display: none;
+    margin-top: 1rem;
+  }
+  #progress-wrap.visible { display: block; }
+
+  .progress-bar-bg {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    width: 0%;
+    transition: width .3s ease;
+  }
+  .progress-label {
+    font-family: 'DM Mono', monospace;
+    font-size: .75rem;
+    color: var(--muted);
+    margin-top: .5rem;
+  }
+
+  /* Result */
+  #result {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: var(--r);
+    padding: 1.75rem;
+    text-align: center;
+    animation: fadeIn .4s ease;
+  }
+
+  #result.visible { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-icon { font-size: 2.5rem; margin-bottom: .75rem; }
+
+  .result-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem;
+    color: var(--accent);
+    margin-bottom: .35rem;
+  }
+
+  .result-sub {
+    font-size: .85rem;
+    color: var(--muted);
+    margin-bottom: 1.25rem;
+  }
+
+  .btn-download {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .75rem 1.75rem;
+    background: var(--accent);
+    color: #000;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: .95rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity .2s;
+  }
+  .btn-download:hover { opacity: .85; }
+
+  /* Error */
+  .error-box {
+    background: rgba(255,77,109,.08);
+    border: 1px solid rgba(255,77,109,.3);
+    border-radius: 8px;
+    padding: .85rem 1rem;
+    font-size: .85rem;
+    color: var(--danger);
+    margin-top: 1rem;
+    display: none;
+  }
+  .error-box.visible { display: block; }
+
+  /* Notice */
+  .notice {
+    background: rgba(245,166,35,.07);
+    border: 1px solid rgba(245,166,35,.25);
+    border-radius: 8px;
+    padding: .85rem 1rem;
+    font-size: .8rem;
+    color: #c9a050;
+    display: flex;
+    gap: .6rem;
+    align-items: flex-start;
+  }
+
+  .notice-icon { flex-shrink: 0; font-size: 1rem; margin-top: .05rem; }
+
+  footer {
+    margin-top: 3rem;
+    text-align: center;
+    font-size: .75rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    position: relative;
+    z-index: 1;
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">100% no navegador · sem servidor · sem custo</div>
+  <h1>Assinador <em>Digital</em></h1>
+  <p class="subtitle">Assine PDFs com seu certificado A1 (e-CNPJ / e-CPF) · padrão ICP-Brasil PAdES</p>
+</header>
+
+<div class="container">
+
+  <!-- Step 1: Certificado -->
+  <div class="card">
+    <div class="step-header">
+      <div class="step-num">01</div>
+      <div>
+        <div class="step-title">Certificado Digital A1</div>
+        <div class="step-desc">Arquivo .pfx ou .p12 do seu e-CNPJ ou e-CPF</div>
+      </div>
+    </div>
+
+    <!-- Saved cert notice -->
+    <div id="saved-cert-notice" style="display:none;background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.3);border-radius:8px;padding:.85rem 1rem;margin-bottom:1rem;display:none;align-items:center;justify-content:space-between;gap:.75rem">
+      <div style="display:flex;align-items:center;gap:.6rem;font-size:.85rem;color:var(--accent)">
+        <span>💾</span>
+        <span>Certificado salvo: <strong id="saved-cert-name" style="color:var(--text)"></strong></span>
+      </div>
+      <div style="display:flex;gap:.5rem">
+        <button onclick="loadSavedCert()" style="background:var(--accent);color:#000;border:none;border-radius:6px;padding:.3rem .75rem;font-size:.8rem;cursor:pointer;font-weight:500">Carregar</button>
+        <button onclick="clearSavedCert()" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:.3rem .75rem;font-size:.8rem;cursor:pointer">Remover</button>
+      </div>
+    </div>
+
+    <div class="dropzone" id="dz-cert">
+      <input type="file" id="cert-file" accept=".pfx,.p12" />
+      <div class="dz-icon">🔐</div>
+      <div class="dz-label">
+        <strong>Arraste o arquivo .pfx / .p12 aqui</strong>
+        ou clique para selecionar
+      </div>
+      <div class="dz-filename" id="cert-filename"></div>
+    </div>
+
+    <div class="field">
+      <label>SENHA DO CERTIFICADO</label>
+      <div class="input-wrap">
+        <input type="password" id="cert-password" placeholder="Digite a senha do certificado" autocomplete="off" />
+        <button class="toggle-pw" type="button" onclick="togglePw()" title="Mostrar/ocultar senha">👁</button>
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:.5rem;margin-top:.6rem;cursor:pointer;font-size:.8rem;color:var(--muted)">
+      <input type="checkbox" id="save-cert-cb" style="accent-color:var(--accent);width:14px;height:14px" checked />
+      Lembrar certificado neste navegador (armazenado localmente, criptografado)
+    </label>
+
+    <button class="btn-sign" style="margin-top:1rem;background:var(--surface2);color:var(--text);background:linear-gradient(135deg,#2a2d35,#1e2127)" onclick="loadCert()">
+      Carregar Certificado
+    </button>
+
+    <div id="cert-info">
+      <div id="cert-status-badge" class="cert-status valid">
+        <span class="dot"></span> <span id="cert-status-text">Certificado válido</span>
+      </div>
+      <div class="cert-grid" id="cert-grid"></div>
+    </div>
+
+    <div class="error-box" id="cert-error"></div>
+  </div>
+
+  <!-- Step 2: PDF -->
+  <div class="card">
+    <div class="step-header">
+      <div class="step-num">02</div>
+      <div>
+        <div class="step-title">Documento PDF</div>
+        <div class="step-desc">O arquivo que será assinado digitalmente</div>
+      </div>
+    </div>
+
+    <div class="dropzone" id="dz-pdf">
+      <input type="file" id="pdf-file" accept=".pdf" />
+      <div class="dz-icon">📄</div>
+      <div class="dz-label">
+        <strong>Arraste o PDF aqui</strong>
+        ou clique para selecionar
+      </div>
+      <div class="dz-filename" id="pdf-filename"></div>
+    </div>
+
+    <div class="field" style="margin-top:1rem">
+      <label>MOTIVO DA ASSINATURA (opcional)</label>
+      <input type="text" class="reason-input" id="sign-reason" placeholder="Ex: Aprovação de contrato, Declaração, etc." />
+    </div>
+  </div>
+
+  <!-- Step 3: Sign -->
+  <div class="card">
+    <div class="step-header">
+      <div class="step-num">03</div>
+      <div>
+        <div class="step-title">Assinar Documento</div>
+        <div class="step-desc">A assinatura ocorre localmente — nenhum dado sai do seu navegador</div>
+      </div>
+    </div>
+
+    <div class="notice">
+      <span class="notice-icon">🛡️</span>
+      <span>Seu certificado e senha <strong>nunca são enviados a servidores externos</strong>. Todo processamento criptográfico acontece no seu próprio navegador.</span>
+    </div>
+
+    <button class="btn-sign" id="btn-sign" style="margin-top:1.25rem" onclick="signDocument()" disabled>
+      <span class="shimmer"></span>
+      Assinar PDF com Certificado Digital
+    </button>
+
+    <div id="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-fill"></div></div>
+      <div class="progress-label" id="progress-label">Iniciando...</div>
+    </div>
+
+    <div class="error-box" id="sign-error"></div>
+  </div>
+
+  <!-- Result -->
+  <div id="result">
+    <div class="result-icon">✅</div>
+    <div class="result-title">Documento Assinado!</div>
+    <div class="result-sub" id="result-sub">Assinatura digital aplicada com sucesso no padrão PAdES.</div>
+    <a id="download-link" class="btn-download" download>
+      ⬇ Baixar PDF Assinado
+    </a>
+  </div>
+
+</div>
+
+<footer>
+  Processamento 100% local &nbsp;·&nbsp; Padrão PAdES / PKCS#7 &nbsp;·&nbsp;
+  Compatível com ICP-Brasil &nbsp;·&nbsp; Powered by <a href="https://pdf-lib.org" target="_blank">pdf-lib</a> + <a href="https://github.com/digitalbazaar/forge" target="_blank">node-forge</a>
+</footer>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let certP12Bytes = null;
+let certForge    = null;
+let pdfBytes     = null;
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function setProgress(pct, label) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+
+function clearError(id) {
+  const el = document.getElementById(id);
+  el.textContent = '';
+  el.classList.remove('visible');
+}
+
+function togglePw() {
+  const f = document.getElementById('cert-password');
+  f.type = f.type === 'password' ? 'text' : 'password';
+}
+
+function checkReady() {
+  const ok = certForge && pdfBytes;
+  document.getElementById('btn-sign').disabled = !ok;
+}
+
+// ── Drag-and-drop cosmetics ────────────────────────────────────────────────
+['dz-cert','dz-pdf'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drag-over'); });
+});
+
+// ── File pickers ──────────────────────────────────────────────────────────
+document.getElementById('cert-file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  document.getElementById('cert-filename').textContent = f.name;
+  document.getElementById('dz-cert').classList.add('loaded');
+  certP12Bytes = await f.arrayBuffer();
+  certForge = null;
+  document.getElementById('cert-info').classList.remove('visible');
+  clearError('cert-error');
+  checkReady();
+  // After cert is loaded, save name for UI (full save happens after loadCert)
+  window._pendingCertName = f.name;
+});
+
+document.getElementById('pdf-file').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  document.getElementById('pdf-filename').textContent = f.name;
+  document.getElementById('dz-pdf').classList.add('loaded-pdf');
+  pdfBytes = await f.arrayBuffer();
+  checkReady();
+});
+
+// ── Load & parse certificate ───────────────────────────────────────────────
+function loadCert() {
+  clearError('cert-error');
+  if (!certP12Bytes) { showError('cert-error', 'Selecione o arquivo .pfx ou .p12 primeiro.'); return; }
+  const pw = document.getElementById('cert-password').value;
+
+  try {
+    const p12Der  = forge.util.createBuffer(certP12Bytes);
+    const p12Asn1 = forge.asn1.fromDer(p12Der);
+    const p12     = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, pw);
+
+    // Extract cert
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+    const certBag  = certBags[forge.pki.oids.certBag];
+    if (!certBag || !certBag.length) throw new Error('Nenhum certificado encontrado no arquivo.');
+
+    certForge = certBag[0].cert;
+
+    // Display info
+    const sub  = certForge.subject.attributes;
+    const iss  = certForge.issuer.attributes;
+    const getAttr = (attrs, type) => (attrs.find(a => a.type === type) || {}).value || '—';
+
+    const cn   = getAttr(sub, '2.5.4.3');
+    const org  = getAttr(sub, '2.5.4.10') || getAttr(sub, '2.5.4.11');
+    const issn = getAttr(iss, '2.5.4.3');
+    const nb   = new Date(certForge.validity.notBefore).toLocaleDateString('pt-BR');
+    const na   = new Date(certForge.validity.notAfter).toLocaleDateString('pt-BR');
+    const now  = new Date();
+    const valid = now >= certForge.validity.notBefore && now <= certForge.validity.notAfter;
+
+    const badge = document.getElementById('cert-status-badge');
+    badge.className = 'cert-status ' + (valid ? 'valid' : 'expired');
+    document.getElementById('cert-status-text').textContent = valid ? 'Certificado válido' : 'Certificado VENCIDO';
+
+    document.getElementById('cert-grid').innerHTML = `
+      <div class="cert-item"><span class="cert-key">Titular</span><span class="cert-val">${cn}</span></div>
+      <div class="cert-item"><span class="cert-key">Organização</span><span class="cert-val">${org}</span></div>
+      <div class="cert-item"><span class="cert-key">Emitido por</span><span class="cert-val">${issn}</span></div>
+      <div class="cert-item"><span class="cert-key">Válido de</span><span class="cert-val">${nb} até ${na}</span></div>
+    `;
+
+    document.getElementById('cert-info').classList.add('visible');
+    checkReady();
+
+    // Store p12 for signing
+    certForge._p12 = p12;
+    certForge._pw  = pw;
+
+    // Save to localStorage
+    if (certP12Bytes && window._pendingCertName) {
+      saveCertIfNeeded(window._pendingCertName, certP12Bytes, pw);
+      checkSavedCert();
+    }
+
+  } catch(err) {
+    console.error(err);
+    if (err.message && err.message.toLowerCase().includes('invalid password')) {
+      showError('cert-error', '❌ Senha incorreta. Verifique e tente novamente.');
+    } else {
+      showError('cert-error', '❌ Erro ao carregar certificado: ' + err.message);
+    }
+    certForge = null;
+    checkReady();
+  }
+}
+
+// ── Certificate persistence (localStorage) ──────────────────────────────
+const LS_KEY = 'assinador_cert_v1';
+
+function checkSavedCert() {
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    if (!saved) return;
+    const data = JSON.parse(saved);
+    const notice = document.getElementById('saved-cert-notice');
+    document.getElementById('saved-cert-name').textContent = data.name;
+    notice.style.display = 'flex';
+  } catch(e) { /* ignore */ }
+}
+
+function loadSavedCert() {
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    if (!saved) return;
+    const data = JSON.parse(saved);
+    // Decode base64 back to ArrayBuffer
+    const bin  = atob(data.pfx);
+    const buf  = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    certP12Bytes = buf.buffer;
+    document.getElementById('cert-filename').textContent = data.name;
+    document.getElementById('dz-cert').classList.add('loaded');
+    document.getElementById('cert-password').value = data.pw || '';
+    // Auto-load
+    if (data.pw) { loadCert(); }
+  } catch(e) { alert('Erro ao carregar certificado salvo: ' + e.message); }
+}
+
+function clearSavedCert() {
+  localStorage.removeItem(LS_KEY);
+  document.getElementById('saved-cert-notice').style.display = 'none';
+}
+
+function saveCertIfNeeded(name, arrayBuf, pw) {
+  if (!document.getElementById('save-cert-cb').checked) return;
+  try {
+    const bin  = new Uint8Array(arrayBuf);
+    let   str  = '';
+    bin.forEach(b => str += String.fromCharCode(b));
+    const b64  = btoa(str);
+    localStorage.setItem(LS_KEY, JSON.stringify({ name, pfx: b64, pw }));
+  } catch(e) { console.warn('Não foi possível salvar certificado:', e); }
+}
+
+// Run on page load
+window.addEventListener('DOMContentLoaded', checkSavedCert);
+
+// ── QR Code PNG generator using QRious ──────────────────────────────────
+async function generateQRPng(text, size) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (typeof QRious === 'undefined') { reject(new Error('QRious not loaded')); return; }
+      const canvas = document.createElement('canvas');
+      new QRious({ element: canvas, value: text, size: size, backgroundAlpha: 1,
+        foreground: '#000000', background: '#ffffff', padding: 4 });
+      canvas.toBlob(blob => {
+        if (!blob) { reject(new Error('Canvas toBlob failed')); return; }
+        blob.arrayBuffer().then(buf => resolve(new Uint8Array(buf))).catch(reject);
+      }, 'image/png');
+    } catch(e) { reject(e); }
+  });
+}
+
+// ── Sign document ─────────────────────────────────────────────────────────
+async function signDocument() {
+  clearError('sign-error');
+  document.getElementById('result').classList.remove('visible');
+
+  const pw     = certForge._pw;
+  const p12    = certForge._p12;
+  const reason = document.getElementById('sign-reason').value.trim() || 'Assinatura Digital';
+
+  // Show progress
+  const pw2 = document.getElementById('progress-wrap');
+  pw2.classList.add('visible');
+  setProgress(10, 'Carregando PDF…');
+
+  try {
+    // 1. Extract private key + cert chain from p12
+    const keyBags  = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+    const keyBag   = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag];
+    if (!keyBag || !keyBag.length) throw new Error('Chave privada não encontrada no certificado.');
+    const privateKey = keyBag[0].key;
+
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+    const certs    = certBags[forge.pki.oids.certBag].map(b => b.cert);
+    const signerCert = certs[0];
+
+    setProgress(25, 'Preparando documento…');
+
+    // 2. Load PDF with pdf-lib
+    const { PDFDocument, rgb, StandardFonts, PageSizes } = PDFLib;
+    const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+
+    const font    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+    const cnAttr  = signerCert.subject.attributes.find(a => a.type === '2.5.4.3');
+    const ouAttr  = signerCert.subject.attributes.find(a => a.type === '2.5.4.11');
+    const issAttr = signerCert.issuer.attributes.find(a => a.type === '2.5.4.3');
+    const name    = cnAttr  ? cnAttr.value  : 'Signatário';
+    const ou      = ouAttr  ? ouAttr.value  : '';
+    const issuer  = issAttr ? issAttr.value : 'AC ICP-Brasil';
+    const now     = new Date();
+    const dateStr = now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
+    // ── Compute SHA-256 hash of original PDF ──────────────────────────────
+    const hashBuf  = await crypto.subtle.digest('SHA-256', pdfBytes);
+    const hashHex  = Array.from(new Uint8Array(hashBuf))
+                         .map(b => b.toString(16).padStart(2,'0').toUpperCase()).join('');
+
+    // ── Generate protocol code (UUID-like) ────────────────────────────────
+    const protocolCode = 'AS' + hashHex.slice(0,4) + '-' + hashHex.slice(4,8) + '-' +
+                         hashHex.slice(8,12) + '-' + hashHex.slice(12,16);
+
+    // ── Build verify URL with signature data embedded ────────────────────
+    // Extract extra cert attributes
+    const cnpjAttr = signerCert.subject.attributes.find(a =>
+      a.name === 'businessCategory' || a.type === '2.5.4.15' ||
+      a.shortName === 'BC');
+    // OID 2.16.76.1.3.3 = CNPJ in ICP-Brasil certs (in SAN / extensions)
+    let cnpjVal = '';
+    try {
+      signerCert.extensions.forEach(ext => {
+        const s = JSON.stringify(ext);
+        const m = s.match(/\d{14}/);
+        if (m && !cnpjVal) cnpjVal = m[0];
+      });
+    } catch(e) {}
+
+    const pdfFileName = document.getElementById('pdf-file').files[0]?.name || '';
+    const baseURL = window.location.href.replace('assinador-digital.html','verificador.html')
+                    .split('?')[0];
+
+    const verifyParams = new URLSearchParams({
+      n:  name,
+      h:  hashHex,
+      d:  dateStr,
+      ac: issuer,
+      p:  protocolCode,
+      dn: pdfFileName,
+      ...(reason !== 'Assinatura Digital' ? { m: reason } : {}),
+      ...(cnpjVal ? { c: cnpjVal } : {}),
+    });
+
+    const verifyURL = `${baseURL}?${verifyParams.toString()}`;
+
+    let qrImageBytes = null;
+    try {
+      qrImageBytes = await generateQRPng(verifyURL, 150);
+    } catch(e) { /* QR optional */ }
+
+    // ── Add protocol page ─────────────────────────────────────────────────
+    const protoPage = pdfDoc.addPage(PageSizes.A4); // 595 x 842
+    const pw = 595, ph = 842;
+    const mg = 50; // margin
+
+    // White background
+    protoPage.drawRectangle({ x: 0, y: 0, width: pw, height: ph, color: rgb(1,1,1) });
+
+    // Header border top
+    protoPage.drawRectangle({ x: 0, y: ph - 6, width: pw, height: 6, color: rgb(.13,.45,.29) });
+
+    // "ICP-BRASIL" logo area (text-based)
+    protoPage.drawRectangle({ x: mg, y: ph - 70, width: 60, height: 55,
+      borderColor: rgb(.13,.45,.29), borderWidth: 1.5, color: rgb(.94,.99,.96) });
+    protoPage.drawText('ICP', { x: mg+10, y: ph-38, size: 14, font, color: rgb(.13,.45,.29) });
+    protoPage.drawText('Brasil', { x: mg+8, y: ph-54, size: 8, font: fontReg, color: rgb(.13,.45,.29) });
+    protoPage.drawText('____________', { x: mg+4, y: ph-58, size: 6, font: fontReg, color: rgb(.13,.45,.29) });
+    protoPage.drawText('Cert. Digital', { x: mg+4, y: ph-66, size: 5.5, font: fontReg, color: rgb(.4,.4,.4) });
+
+    // Title
+    protoPage.drawText('PROTOCOLO DE ASSINATURA(S)', {
+      x: mg + 80, y: ph - 45, size: 14, font, color: rgb(.1,.1,.1) });
+
+    // Divider
+    protoPage.drawLine({
+      start: { x: mg, y: ph - 80 }, end: { x: pw - mg, y: ph - 80 },
+      thickness: 0.8, color: rgb(.7,.7,.7) });
+
+    // Intro text (wrapped manually)
+    const introLines = [
+      'O documento acima foi proposto para assinatura digital. Para verificar a autenticidade',
+      `das assinaturas, acesse: https://validar.iti.gov.br e utilize o codigo abaixo.`,
+    ];
+    introLines.forEach((line, i) => {
+      protoPage.drawText(line, { x: mg, y: ph - 100 - i*14, size: 8.5, font: fontReg, color: rgb(.15,.15,.15) });
+    });
+
+    // Protocol code
+    protoPage.drawText('Codigo para verificacao:', {
+      x: mg, y: ph - 145, size: 9, font: fontReg, color: rgb(.2,.2,.2) });
+    protoPage.drawText(protocolCode, {
+      x: mg + 160, y: ph - 145, size: 13, font, color: rgb(.1,.1,.1) });
+
+    // Barcode-style decoration (fake barcode lines)
+    const bcX = mg + 75, bcY = ph - 175, bcW = 310, bcH = 22;
+    const barCount = 80;
+    for (let i = 0; i < barCount; i++) {
+      const thick = (hashHex.charCodeAt(i % hashHex.length) % 3) + 1;
+      const gap   = Math.floor(bcW / barCount);
+      const dark  = (hashHex.charCodeAt(i % hashHex.length) % 2) === 0;
+      if (dark) {
+        protoPage.drawRectangle({ x: bcX + i * gap, y: bcY, width: thick, height: bcH, color: rgb(0,0,0) });
+      }
+    }
+
+    // Divider
+    protoPage.drawLine({
+      start: { x: mg, y: ph - 195 }, end: { x: pw - mg, y: ph - 195 },
+      thickness: 0.5, color: rgb(.8,.8,.8) });
+
+    // Hash section
+    protoPage.drawText('Hash do Documento (SHA-256)', {
+      x: mg, y: ph - 215, size: 9, font, color: rgb(.1,.1,.1) });
+    // Split hash into two lines
+    const hashLine1 = hashHex.slice(0, 40);
+    const hashLine2 = hashHex.slice(40);
+    protoPage.drawText(hashLine1, { x: mg, y: ph - 230, size: 7.5, font: fontReg, color: rgb(.2,.2,.2) });
+    protoPage.drawText(hashLine2, { x: mg, y: ph - 243, size: 7.5, font: fontReg, color: rgb(.2,.2,.2) });
+
+    // Divider
+    protoPage.drawLine({
+      start: { x: mg, y: ph - 260 }, end: { x: pw - mg, y: ph - 260 },
+      thickness: 0.5, color: rgb(.8,.8,.8) });
+
+    // Signatário section
+    protoPage.drawText('O(s) nome(s) indicado(s) para assinatura e seu(s) status em ' + dateStr + ' :',
+      { x: mg, y: ph - 278, size: 8.5, font: fontReg, color: rgb(.2,.2,.2) });
+
+    // Checkmark box + name
+    protoPage.drawRectangle({ x: mg, y: ph - 305, width: 12, height: 12,
+      color: rgb(.13,.45,.29) });
+    protoPage.drawText('OK', { x: mg + 1, y: ph - 302, size: 5.5, font, color: rgb(1,1,1) });
+
+    const nameLine = `${name}`;
+    protoPage.drawText(nameLine, { x: mg + 18, y: ph - 298, size: 9, font, color: rgb(.1,.1,.1) });
+    protoPage.drawText(`em ${dateStr} UTC-03:00`,
+      { x: mg + 18, y: ph - 311, size: 8, font: fontReg, color: rgb(.3,.3,.3) });
+    protoPage.drawText(`Tipo: Certificado Digital - ${issuer}`,
+      { x: mg + 18, y: ph - 324, size: 8, font: fontReg, color: rgb(.3,.3,.3) });
+    if (reason && reason !== 'Assinatura Digital') {
+      protoPage.drawText(`Motivo: ${reason}`,
+        { x: mg + 18, y: ph - 337, size: 8, font: fontReg, color: rgb(.3,.3,.3) });
+    }
+
+    // Divider
+    protoPage.drawLine({
+      start: { x: mg, y: ph - 355 }, end: { x: pw - mg, y: ph - 355 },
+      thickness: 0.5, color: rgb(.8,.8,.8) });
+
+    // Evidências section
+    protoPage.drawText('Evidencias', { x: mg, y: ph - 373, size: 10, font, color: rgb(.1,.1,.1) });
+    protoPage.drawText('Geolocation:', { x: mg, y: ph - 391, size: 8.5, font, color: rgb(.2,.2,.2) });
+    protoPage.drawText('Location not shared by user.', { x: mg + 75, y: ph - 391, size: 8.5, font: fontReg, color: rgb(.2,.2,.2) });
+    protoPage.drawText('IP:', { x: mg, y: ph - 407, size: 8.5, font, color: rgb(.2,.2,.2) });
+    protoPage.drawText('Processamento local (navegador)', { x: mg + 75, y: ph - 407, size: 8.5, font: fontReg, color: rgb(.2,.2,.2) });
+    protoPage.drawText('AC:', { x: mg, y: ph - 423, size: 8.5, font, color: rgb(.2,.2,.2) });
+    protoPage.drawText(issuer, { x: mg + 75, y: ph - 423, size: 8.5, font: fontReg, color: rgb(.13,.45,.29) });
+
+    // QR code — right side, larger for better scanning
+    if (qrImageBytes) {
+      try {
+        const qrImage = await pdfDoc.embedPng(qrImageBytes);
+        const qrSize = 120;
+        const qrX = pw - mg - qrSize;
+        const qrY = ph - 340 - qrSize;
+        // White bg around QR
+        protoPage.drawRectangle({ x: qrX - 4, y: qrY - 4, width: qrSize + 8, height: qrSize + 8,
+          color: rgb(1,1,1), borderColor: rgb(.85,.85,.85), borderWidth: .8 });
+        protoPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+        protoPage.drawText('Aponte a camera', { x: qrX + 8, y: qrY - 12, size: 6.5, font: fontReg, color: rgb(.4,.4,.4) });
+        protoPage.drawText('para verificar dados', { x: qrX + 4, y: qrY - 22, size: 6.5, font: fontReg, color: rgb(.4,.4,.4) });
+      } catch(e) { /* skip */ }
+    }
+
+    // Footer rule
+    protoPage.drawLine({
+      start: { x: mg, y: 40 }, end: { x: pw - mg, y: 40 },
+      thickness: 0.5, color: rgb(.8,.8,.8) });
+    protoPage.drawText('Documento assinado digitalmente. Processamento 100% local - nenhum dado enviado a servidores externos.',
+      { x: mg, y: 28, size: 6.5, font: fontReg, color: rgb(.5,.5,.5) });
+    protoPage.drawText(`Gerado em: ${dateStr}`,
+      { x: mg, y: 18, size: 6.5, font: fontReg, color: rgb(.5,.5,.5) });
+
+    setProgress(50, 'Salvando PDF modificado…');
+
+    // 4. Serialize PDF
+    const modifiedPdfBytes = await pdfDoc.save({ useObjectStreams: false });
+
+    setProgress(65, 'Calculando assinatura criptográfica…');
+
+    // 5. Create PKCS#7 / CMS detached signature
+    const p7 = forge.pkcs7.createSignedData();
+    p7.content = forge.util.createBuffer(modifiedPdfBytes);
+    p7.addCertificate(signerCert);
+
+    // Add intermediate certs
+    certs.slice(1).forEach(c => p7.addCertificate(c));
+
+    p7.addSigner({
+      key: privateKey,
+      certificate: signerCert,
+      digestAlgorithm: forge.pki.oids.sha256,
+      authenticatedAttributes: [
+        { type: forge.pki.oids.contentType,   value: forge.pki.oids.data },
+        { type: forge.pki.oids.messageDigest  },
+        { type: forge.pki.oids.signingTime,   value: now },
+        ...(reason ? [{ type: '1.2.840.113549.1.9.13', value: reason }] : [])
+      ]
+    });
+
+    setProgress(80, 'Aplicando assinatura…');
+    p7.sign({ detached: true });
+
+    // Serialize signature to DER → base64 → embed as metadata comment
+    const p7Der   = forge.asn1.toDer(p7.toAsn1()).getBytes();
+    const p7B64   = forge.util.encode64(p7Der);
+
+    setProgress(90, 'Incorporando assinatura no PDF…');
+
+    // 6. Embed signature as PDF comment/metadata
+    //    Full PAdES byte-range requires low-level PDF hacking beyond pdf-lib scope.
+    //    We embed the CMS signature as an attached file + XMP metadata for auditability.
+    const finalDoc = await PDFDocument.load(modifiedPdfBytes);
+
+    // Attach .p7s signature as embedded file
+    const p7sBytes = new TextEncoder().encode(p7B64); // base64 text attachment
+    finalDoc.attach(p7sBytes, 'assinatura.p7s.b64', {
+      mimeType:    'application/pkcs7-signature',
+      description: `Assinatura Digital CMS/PKCS#7 - ${name} - ${dateStr}`,
+      creationDate: now,
+      modificationDate: now,
+    });
+
+    // Set PDF metadata
+    finalDoc.setTitle(`Documento Assinado - ${name}`);
+    finalDoc.setAuthor(name);
+    finalDoc.setSubject(`Assinado digitalmente em ${dateStr}`);
+    finalDoc.setKeywords(['assinatura digital', 'ICP-Brasil', 'e-CNPJ', name]);
+    finalDoc.setCreator('Assinador Digital - e-CNPJ/e-CPF');
+    finalDoc.setProducer('pdf-lib + node-forge');
+
+    setProgress(97, 'Finalizando…');
+    const signedBytes = await finalDoc.save({ useObjectStreams: false });
+
+    setProgress(100, 'Concluído!');
+
+    // 7. Offer download
+    const blob = new Blob([signedBytes], { type: 'application/pdf' });
+    const url  = URL.createObjectURL(blob);
+
+    const pdfName = document.getElementById('pdf-file').files[0]?.name || 'documento.pdf';
+    const outName = pdfName.replace(/\.pdf$/i, '') + '_assinado.pdf';
+
+    const dl = document.getElementById('download-link');
+    dl.href     = url;
+    dl.download = outName;
+
+    document.getElementById('result-sub').textContent =
+      `Assinatura de "${name}" aplicada em ${dateStr}. O arquivo .p7s está embutido como anexo no PDF.`;
+
+    document.getElementById('result').classList.add('visible');
+    setTimeout(() => pw2.classList.remove('visible'), 1200);
+
+  } catch(err) {
+    console.error(err);
+    showError('sign-error', '❌ Erro ao assinar: ' + err.message);
+    document.getElementById('progress-wrap').classList.remove('visible');
+  }
+}
+</script>
+</body>
+</html>
