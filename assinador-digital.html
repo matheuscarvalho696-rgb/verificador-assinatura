@@ -898,7 +898,7 @@ async function signDocument() {
     // Intro text (wrapped manually)
     const introLines = [
       'O documento acima foi proposto para assinatura digital. Para verificar a autenticidade',
-      `das assinaturas, acesse: https://validar.iti.gov.br e utilize o codigo abaixo.`,
+      `das assinaturas, escaneie o QR Code abaixo ou acesse: https://validar.iti.gov.br`,
     ];
     introLines.forEach((line, i) => {
       protoPage.drawText(line, { x: mg, y: ph - 100 - i*14, size: 8.5, font: fontReg, color: rgb(.15,.15,.15) });
@@ -910,31 +910,18 @@ async function signDocument() {
     protoPage.drawText(protocolCode, {
       x: mg + 160, y: ph - 145, size: 13, font, color: rgb(.1,.1,.1) });
 
-    // Barcode-style decoration (fake barcode lines)
-    const bcX = mg + 75, bcY = ph - 175, bcW = 310, bcH = 22;
-    const barCount = 80;
-    for (let i = 0; i < barCount; i++) {
-      const thick = (hashHex.charCodeAt(i % hashHex.length) % 3) + 1;
-      const gap   = Math.floor(bcW / barCount);
-      const dark  = (hashHex.charCodeAt(i % hashHex.length) % 2) === 0;
-      if (dark) {
-        protoPage.drawRectangle({ x: bcX + i * gap, y: bcY, width: thick, height: bcH, color: rgb(0,0,0) });
-      }
-    }
-
     // Divider
     protoPage.drawLine({
-      start: { x: mg, y: ph - 195 }, end: { x: pw - mg, y: ph - 195 },
+      start: { x: mg, y: ph - 162 }, end: { x: pw - mg, y: ph - 162 },
       thickness: 0.5, color: rgb(.8,.8,.8) });
 
     // Hash section
     protoPage.drawText('Hash do Documento (SHA-256)', {
-      x: mg, y: ph - 215, size: 9, font, color: rgb(.1,.1,.1) });
-    // Split hash into two lines
+      x: mg, y: ph - 180, size: 9, font, color: rgb(.1,.1,.1) });
     const hashLine1 = hashHex.slice(0, 40);
     const hashLine2 = hashHex.slice(40);
-    protoPage.drawText(hashLine1, { x: mg, y: ph - 230, size: 7.5, font: fontReg, color: rgb(.2,.2,.2) });
-    protoPage.drawText(hashLine2, { x: mg, y: ph - 243, size: 7.5, font: fontReg, color: rgb(.2,.2,.2) });
+    protoPage.drawText(hashLine1, { x: mg, y: ph - 195, size: 7.5, font: fontReg, color: rgb(.2,.2,.2) });
+    protoPage.drawText(hashLine2, { x: mg, y: ph - 208, size: 7.5, font: fontReg, color: rgb(.2,.2,.2) });
 
     // Divider
     protoPage.drawLine({
