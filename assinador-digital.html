@@ -620,7 +620,17 @@ function checkReady() {
   const el = document.getElementById(id);
   el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
   el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('drag-over'); });
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    el.classList.remove('drag-over');
+    const input = el.querySelector('input[type="file"]');
+    if (!input || !e.dataTransfer.files.length) return;
+    // Manually trigger change with dropped files
+    const dt = new DataTransfer();
+    Array.from(e.dataTransfer.files).forEach(f => dt.items.add(f));
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  });
 });
 
 // ── File pickers ──────────────────────────────────────────────────────────
@@ -820,6 +830,8 @@ async function signDocument() {
     const { PDFDocument, rgb, StandardFonts, PageSizes } = PDFLib;
     const total = pdfFiles.length;
     const signedResults = [];
+    const now     = new Date();
+    const dateStr = now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
     for (let fileIdx = 0; fileIdx < total; fileIdx++) {
       const currentFile = pdfFiles[fileIdx];
@@ -840,8 +852,6 @@ async function signDocument() {
     const name    = cnAttr  ? cnAttr.value  : 'Signatário';
     const ou      = ouAttr  ? ouAttr.value  : '';
     const issuer  = issAttr ? issAttr.value : 'AC ICP-Brasil';
-    const now     = new Date();
-    const dateStr = now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
     // ── Compute SHA-256 hash of original PDF ──────────────────────────────
     const hashBuf  = await crypto.subtle.digest('SHA-256', currentFile.bytes);
