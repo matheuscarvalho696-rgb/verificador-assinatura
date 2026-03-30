@@ -514,20 +514,23 @@
     <div class="step-header">
       <div class="step-num">02</div>
       <div>
-        <div class="step-title">Documento PDF</div>
-        <div class="step-desc">O arquivo que será assinado digitalmente</div>
+        <div class="step-title">Documentos PDF</div>
+        <div class="step-desc">Selecione um ou vários PDFs para assinar de uma vez</div>
       </div>
     </div>
 
     <div class="dropzone" id="dz-pdf">
-      <input type="file" id="pdf-file" accept=".pdf" />
+      <input type="file" id="pdf-file" accept=".pdf" multiple />
       <div class="dz-icon">📄</div>
       <div class="dz-label">
-        <strong>Arraste o PDF aqui</strong>
+        <strong>Arraste um ou vários PDFs aqui</strong>
         ou clique para selecionar
       </div>
       <div class="dz-filename" id="pdf-filename"></div>
     </div>
+
+    <!-- File list -->
+    <div id="pdf-list" style="display:none;margin-top:1rem;display:none;flex-direction:column;gap:.4rem"></div>
 
     <div class="field" style="margin-top:1rem">
       <label>MOTIVO DA ASSINATURA (opcional)</label>
@@ -552,7 +555,7 @@
 
     <button class="btn-sign" id="btn-sign" style="margin-top:1.25rem" onclick="signDocument()" disabled>
       <span class="shimmer"></span>
-      Assinar PDF com Certificado Digital
+      Assinar PDF(s) com Certificado Digital
     </button>
 
     <div id="progress-wrap">
@@ -566,11 +569,9 @@
   <!-- Result -->
   <div id="result">
     <div class="result-icon">✅</div>
-    <div class="result-title">Documento Assinado!</div>
-    <div class="result-sub" id="result-sub">Assinatura digital aplicada com sucesso no padrão PAdES.</div>
-    <a id="download-link" class="btn-download" download>
-      ⬇ Baixar PDF Assinado
-    </a>
+    <div class="result-title" id="result-title">Documento Assinado!</div>
+    <div class="result-sub" id="result-sub">Assinatura digital aplicada com sucesso.</div>
+    <div id="download-list" style="display:flex;flex-direction:column;gap:.6rem;width:100%;margin-top:.5rem"></div>
   </div>
 
 </div>
@@ -584,7 +585,7 @@
 // ── State ──────────────────────────────────────────────────────────────────
 let certP12Bytes = null;
 let certForge    = null;
-let pdfBytes     = null;
+let pdfFiles     = []; // array of {name, bytes}
 
 // ── UI helpers ─────────────────────────────────────────────────────────────
 function setProgress(pct, label) {
@@ -610,7 +611,7 @@ function togglePw() {
 }
 
 function checkReady() {
-  const ok = certForge && pdfBytes;
+  const ok = certForge && pdfFiles.length > 0;
   document.getElementById('btn-sign').disabled = !ok;
 }
 
@@ -637,10 +638,26 @@ document.getElementById('cert-file').addEventListener('change', async e => {
 });
 
 document.getElementById('pdf-file').addEventListener('change', async e => {
-  const f = e.target.files[0]; if (!f) return;
-  document.getElementById('pdf-filename').textContent = f.name;
-  document.getElementById('dz-pdf').classList.add('loaded-pdf');
-  pdfBytes = await f.arrayBuffer();
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  pdfFiles = [];
+  for (const f of files) {
+    const bytes = await f.arrayBuffer();
+    pdfFiles.push({ name: f.name, bytes });
+  }
+  // Update dropzone label
+  const dz = document.getElementById('dz-pdf');
+  dz.classList.add('loaded-pdf');
+  document.getElementById('pdf-filename').textContent =
+    files.length === 1 ? files[0].name : `${files.length} arquivos selecionados`;
+  // Render file list
+  const listEl = document.getElementById('pdf-list');
+  listEl.style.display = 'flex';
+  listEl.innerHTML = pdfFiles.map((f, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem">
+      <span style="font-size:.82rem;color:var(--text)">📄 ${f.name}</span>
+      <span id="status-${i}" style="font-size:.75rem;color:var(--muted)">Aguardando</span>
+    </div>`).join('');
   checkReady();
 });
 
@@ -778,19 +795,16 @@ async function generateQRPng(text, size) {
   });
 }
 
-// ── Sign document ─────────────────────────────────────────────────────────
+// ── Sign document (batch) ────────────────────────────────────────────────
 async function signDocument() {
   clearError('sign-error');
   document.getElementById('result').classList.remove('visible');
+  document.getElementById('download-list').innerHTML = '';
 
-  const pw     = certForge._pw;
   const p12    = certForge._p12;
   const reason = document.getElementById('sign-reason').value.trim() || 'Assinatura Digital';
-
-  // Show progress
-  const pw2 = document.getElementById('progress-wrap');
+  const pw2    = document.getElementById('progress-wrap');
   pw2.classList.add('visible');
-  setProgress(10, 'Carregando PDF…');
 
   try {
     // 1. Extract private key + cert chain from p12
@@ -803,11 +817,19 @@ async function signDocument() {
     const certs    = certBags[forge.pki.oids.certBag].map(b => b.cert);
     const signerCert = certs[0];
 
-    setProgress(25, 'Preparando documento…');
+    const { PDFDocument, rgb, StandardFonts, PageSizes } = PDFLib;
+    const total = pdfFiles.length;
+    const signedResults = [];
+
+    for (let fileIdx = 0; fileIdx < total; fileIdx++) {
+      const currentFile = pdfFiles[fileIdx];
+      const statusEl = document.getElementById(`status-${fileIdx}`);
+      if (statusEl) { statusEl.textContent = 'Assinando...'; statusEl.style.color = 'var(--warn)'; }
+
+      setProgress(Math.round((fileIdx / total) * 90) + 5, `Assinando ${fileIdx+1} de ${total}: ${currentFile.name}…`);
 
     // 2. Load PDF with pdf-lib
-    const { PDFDocument, rgb, StandardFonts, PageSizes } = PDFLib;
-    const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+    const pdfDoc = await PDFDocument.load(currentFile.bytes, { ignoreEncryption: true });
 
     const font    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -822,7 +844,7 @@ async function signDocument() {
     const dateStr = now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
     // ── Compute SHA-256 hash of original PDF ──────────────────────────────
-    const hashBuf  = await crypto.subtle.digest('SHA-256', pdfBytes);
+    const hashBuf  = await crypto.subtle.digest('SHA-256', currentFile.bytes);
     const hashHex  = Array.from(new Uint8Array(hashBuf))
                          .map(b => b.toString(16).padStart(2,'0').toUpperCase()).join('');
 
@@ -845,7 +867,7 @@ async function signDocument() {
       });
     } catch(e) {}
 
-    const pdfFileName = document.getElementById('pdf-file').files[0]?.name || '';
+    const pdfFileName = currentFile.name;
     const baseURL = window.location.href.replace('assinador-digital.html','verificador.html')
                     .split('?')[0];
 
@@ -1050,22 +1072,36 @@ async function signDocument() {
 
     setProgress(100, 'Concluído!');
 
-    // 7. Offer download
-    const blob = new Blob([signedBytes], { type: 'application/pdf' });
-    const url  = URL.createObjectURL(blob);
+    // 7. Accumulate result
+    const blob    = new Blob([signedBytes], { type: 'application/pdf' });
+    const url     = URL.createObjectURL(blob);
+    const outName = currentFile.name.replace(/\.pdf$/i, '') + '_assinado.pdf';
+    signedResults.push({ url, outName });
 
-    const pdfName = document.getElementById('pdf-file').files[0]?.name || 'documento.pdf';
-    const outName = pdfName.replace(/\.pdf$/i, '') + '_assinado.pdf';
+    if (statusEl) { statusEl.textContent = 'Assinado ✓'; statusEl.style.color = 'var(--accent)'; }
 
-    const dl = document.getElementById('download-link');
-    dl.href     = url;
-    dl.download = outName;
+    } // end for loop
 
+    // 8. Show all download buttons
+    setProgress(100, `${total} documento(s) assinado(s)!`);
+
+    const dlList = document.getElementById('download-list');
+    signedResults.forEach(r => {
+      const a = document.createElement('a');
+      a.href     = r.url;
+      a.download = r.outName;
+      a.className = 'btn-download';
+      a.innerHTML = `⬇ ${r.outName}`;
+      dlList.appendChild(a);
+    });
+
+    const plural = total > 1 ? `${total} documentos assinados` : '1 documento assinado';
+    document.getElementById('result-title').textContent = plural + '!';
     document.getElementById('result-sub').textContent =
-      `Assinatura de "${name}" aplicada em ${dateStr}. O arquivo .p7s está embutido como anexo no PDF.`;
+      `Assinatura de "${name}" aplicada em ${dateStr}.`;
 
     document.getElementById('result').classList.add('visible');
-    setTimeout(() => pw2.classList.remove('visible'), 1200);
+    setTimeout(() => pw2.classList.remove('visible'), 1500);
 
   } catch(err) {
     console.error(err);
