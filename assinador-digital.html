@@ -410,24 +410,27 @@ async function signDocument(){
       pg.drawText(proto,{x:M+165,y:H-145,size:13,font,color:C(.07,.15,.3)});
       pg.drawLine({start:{x:M,y:H-162},end:{x:W-M,y:H-162},thickness:.5,color:C(.8,.8,.8)});
       pg.drawText('Hash do Documento (SHA-256)',{x:M,y:H-180,size:9,font,color:C(.1,.1,.1)});
-      pg.drawText(hashHex.slice(0,40),{x:M,y:H-195,size:7.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawText(hashHex.slice(40),{x:M,y:H-208,size:7.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawLine({start:{x:M,y:H-225},end:{x:W-M,y:H-225},thickness:.5,color:C(.8,.8,.8)});
-      pg.drawText(`O(s) nome(s) indicado(s) para assinatura e seu(s) status em ${dateStr} :`,{x:M,y:H-243,size:8.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawRectangle({x:M,y:H-270,width:12,height:12,color:C(.1,.23,.42)});
-      pg.drawText('OK',{x:M+1,y:H-267,size:5.5,font,color:C(1,1,1)});
-      pg.drawText(name,{x:M+18,y:H-263,size:9,font,color:C(.07,.15,.3)});
-      pg.drawText(`em ${dateStr} UTC-03:00`,{x:M+18,y:H-276,size:8,font:fontReg,color:C(.3,.3,.3)});
-      pg.drawText(`Tipo: Certificado Digital - ${issuer}`,{x:M+18,y:H-289,size:8,font:fontReg,color:C(.3,.3,.3)});
-      if(reason!=='Assinatura Digital') pg.drawText(`Motivo: ${reason}`,{x:M+18,y:H-302,size:8,font:fontReg,color:C(.3,.3,.3)});
-      pg.drawLine({start:{x:M,y:H-318},end:{x:W-M,y:H-318},thickness:.5,color:C(.8,.8,.8)});
-      pg.drawText('Evidencias',{x:M,y:H-336,size:10,font,color:C(.1,.1,.1)});
-      pg.drawText('Geolocation:',{x:M,y:H-354,size:8.5,font,color:C(.2,.2,.2)});
-      pg.drawText('Location not shared by user.',{x:M+80,y:H-354,size:8.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawText('IP:',{x:M,y:H-370,size:8.5,font,color:C(.2,.2,.2)});
-      pg.drawText('Processamento local (navegador)',{x:M+80,y:H-370,size:8.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawText('AC:',{x:M,y:H-386,size:8.5,font,color:C(.2,.2,.2)});
-      pg.drawText(issuer,{x:M+80,y:H-386,size:8.5,font:fontReg,color:C(.1,.23,.42)});
+      pg.drawText('(copie as duas linhas juntas, sem espacos)',{x:M,y:H-191,size:6.5,font:fontReg,color:C(.5,.5,.5)});
+      pg.drawText(hashHex.slice(0,32),{x:M,y:H-203,size:7.5,font:fontReg,color:C(.1,.1,.1)});
+      pg.drawText(hashHex.slice(32,64),{x:M,y:H-215,size:7.5,font:fontReg,color:C(.1,.1,.1)});
+      // Verify: both halves are 32 chars, total = 64
+      pg.drawText('Total: '+hashHex.length+' caracteres (SHA-256 valido)',{x:M,y:H-227,size:6,font:fontReg,color:C(.5,.5,.5)});
+      pg.drawLine({start:{x:M,y:H-238},end:{x:W-M,y:H-238},thickness:.5,color:C(.8,.8,.8)});
+      pg.drawText(`O(s) nome(s) indicado(s) para assinatura e seu(s) status em ${dateStr} :`,{x:M,y:H-256,size:8.5,font:fontReg,color:C(.2,.2,.2)});
+      pg.drawRectangle({x:M,y:H-283,width:12,height:12,color:C(.1,.23,.42)});
+      pg.drawText('OK',{x:M+1,y:H-280,size:5.5,font,color:C(1,1,1)});
+      pg.drawText(name,{x:M+18,y:H-276,size:9,font,color:C(.07,.15,.3)});
+      pg.drawText(`em ${dateStr} UTC-03:00`,{x:M+18,y:H-315,size:8,font:fontReg,color:C(.3,.3,.3)});
+      pg.drawText(`Tipo: Certificado Digital - ${issuer}`,{x:M+18,y:H-315,size:8,font:fontReg,color:C(.3,.3,.3)});
+      if(reason!=='Assinatura Digital') pg.drawText(`Motivo: ${reason}`,{x:M+18,y:H-315,size:8,font:fontReg,color:C(.3,.3,.3)});
+      pg.drawLine({start:{x:M,y:H-331},end:{x:W-M,y:H-318},thickness:.5,color:C(.8,.8,.8)});
+      pg.drawText('Evidencias',{x:M,y:H-349,size:10,font,color:C(.1,.1,.1)});
+      pg.drawText('Geolocation:',{x:M,y:H-367,size:8.5,font,color:C(.2,.2,.2)});
+      pg.drawText('Location not shared by user.',{x:M+80,y:H-367,size:8.5,font:fontReg,color:C(.2,.2,.2)});
+      pg.drawText('IP:',{x:M,y:H-383,size:8.5,font,color:C(.2,.2,.2)});
+      pg.drawText('Processamento local (navegador)',{x:M+80,y:H-383,size:8.5,font:fontReg,color:C(.2,.2,.2)});
+      pg.drawText('AC:',{x:M,y:H-399,size:8.5,font,color:C(.2,.2,.2)});
+      pg.drawText(issuer,{x:M+80,y:H-399,size:8.5,font:fontReg,color:C(.1,.23,.42)});
 
       if(qrImg){
         try{
