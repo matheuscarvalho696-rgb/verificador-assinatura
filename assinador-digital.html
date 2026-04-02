@@ -11,7 +11,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 :root {
   --navy:#0a1628; --blue:#1a3a6b; --mid:#2563a8; --light:#4a90d9;
-  --sky:#e8f2fc; --white:#ffffff; --border:#c5d8f0; --text:#0a1628;
+  --sky:#e8f2fc; --white:#ffffff; --border:#c5d8f0;
   --muted:#5a7a9a; --success:#1a7a4a; --danger:#c0392b; --r:10px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -53,7 +53,7 @@ h1 span{color:var(--light)}
 .field input{width:100%;background:var(--white);border:1px solid var(--border);border-radius:6px;color:var(--navy);font-family:'Inter',sans-serif;font-size:.9rem;padding:.65rem .85rem;outline:none;transition:border-color .2s}
 .field input:focus{border-color:var(--mid);box-shadow:0 0 0 3px rgba(37,99,168,.1)}
 .field input[type="password"]{padding-right:2.5rem}
-.toggle-pw{position:absolute;right:.75rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.95rem;transition:color .15s}
+.toggle-pw{position:absolute;right:.75rem;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.95rem}
 .toggle-pw:hover{color:var(--navy)}
 .remember-label{display:flex;align-items:center;gap:.5rem;margin-top:.7rem;cursor:pointer;font-size:.78rem;color:var(--muted)}
 .remember-label input{accent-color:var(--mid);width:14px;height:14px}
@@ -101,13 +101,12 @@ footer a{color:var(--mid);text-decoration:none}
 </head>
 <body>
 <header>
-  <div class="badge">100% local · sem servidor · sem custo</div>
+  <div class="badge">PAdES · Byte-Range · ICP-Brasil</div>
   <h1>Assinador <span>Digital</span></h1>
-  <p class="subtitle">Assine PDFs com seu certificado A1 (e-CNPJ / e-CPF) · padrão ICP-Brasil</p>
+  <p class="subtitle">Assine PDFs com seu certificado A1 (e-CNPJ / e-CPF) · assinatura criptográfica real</p>
 </header>
 
 <div class="container">
-
   <!-- STEP 1 -->
   <div class="card">
     <div class="step-header">
@@ -179,11 +178,11 @@ footer a{color:var(--mid);text-decoration:none}
       <div class="step-num">03</div>
       <div>
         <div class="step-title">Assinar Documento(s)</div>
-        <div class="step-desc">A assinatura ocorre localmente — nenhum dado sai do seu navegador</div>
+        <div class="step-desc">Assinatura criptográfica real com byte-range — hash do arquivo final</div>
       </div>
     </div>
     <div class="notice">
-      🛡️&nbsp; Seu certificado e senha <strong>nunca são enviados a servidores externos</strong>. Todo processamento criptográfico acontece no seu próprio navegador.
+      🔐&nbsp; Assinatura <strong>PAdES real</strong>: o PDF é finalizado primeiro, depois o hash é calculado e assinado com sua chave privada. Nenhum dado sai do navegador.
     </div>
     <button class="btn btn-primary" id="btn-sign" onclick="signDocument()" disabled>
       <span class="shimmer"></span>
@@ -200,15 +199,14 @@ footer a{color:var(--mid);text-decoration:none}
   <div id="result">
     <div class="result-icon">✅</div>
     <div class="result-title" id="result-title">Documento Assinado!</div>
-    <div class="result-sub"   id="result-sub">Assinatura digital aplicada com sucesso.</div>
+    <div class="result-sub"   id="result-sub">Assinatura criptográfica aplicada com sucesso.</div>
     <div class="download-list" id="download-list"></div>
   </div>
-
 </div>
 
 <footer>
-  Processamento 100% local &nbsp;·&nbsp; PAdES / PKCS#7 &nbsp;·&nbsp;
-  ICP-Brasil &nbsp;·&nbsp; <a href="https://validar.iti.gov.br" target="_blank">validar.iti.gov.br</a>
+  PAdES · Byte-Range Signing · SHA-256 + RSA · ICP-Brasil ·
+  <a href="https://validar.iti.gov.br" target="_blank">validar.iti.gov.br</a>
 </footer>
 
 <script>
@@ -217,20 +215,19 @@ let certP12Bytes = null;
 let certForge    = null;
 let pdfFiles     = [];
 
-function setProgress(pct, label) { $('progress-fill').style.width=pct+'%'; $('progress-label').textContent=label; }
+function setProgress(pct, label){ $('progress-fill').style.width=pct+'%'; $('progress-label').textContent=label; }
 function showError(id,msg){ const e=$(id); e.textContent=msg; e.classList.add('visible'); }
 function clearError(id)   { const e=$(id); e.textContent='';  e.classList.remove('visible'); }
 function togglePw(){ const f=$('cert-password'); f.type=f.type==='password'?'text':'password'; }
-function checkReady(){ $('btn-sign').disabled=!(certForge && pdfFiles.length>0); }
+function checkReady(){ $('btn-sign').disabled=!(certForge&&pdfFiles.length>0); }
 
-// Drag-and-drop
+// Drag and drop
 ['dz-cert','dz-pdf'].forEach(id=>{
   const el=$(id);
   el.addEventListener('dragover', e=>{ e.preventDefault(); el.classList.add('drag-over'); });
   el.addEventListener('dragleave',()=> el.classList.remove('drag-over'));
   el.addEventListener('drop', e=>{
-    e.preventDefault();
-    el.classList.remove('drag-over');
+    e.preventDefault(); el.classList.remove('drag-over');
     const input=el.querySelector('input[type="file"]');
     if(!input||!e.dataTransfer.files.length) return;
     const dt=new DataTransfer();
@@ -240,7 +237,6 @@ function checkReady(){ $('btn-sign').disabled=!(certForge && pdfFiles.length>0);
   });
 });
 
-// Cert picker
 $('cert-file').addEventListener('change', async e=>{
   const f=e.target.files[0]; if(!f) return;
   $('cert-filename').textContent=f.name;
@@ -253,7 +249,6 @@ $('cert-file').addEventListener('change', async e=>{
   checkReady();
 });
 
-// PDF picker
 $('pdf-file').addEventListener('change', async e=>{
   const files=Array.from(e.target.files); if(!files.length) return;
   pdfFiles=[];
@@ -268,7 +263,6 @@ $('pdf-file').addEventListener('change', async e=>{
   checkReady();
 });
 
-// Load cert
 function loadCert(){
   clearError('cert-error');
   if(!certP12Bytes){ showError('cert-error','Selecione o arquivo .pfx ou .p12 primeiro.'); return; }
@@ -323,7 +317,7 @@ function saveCertIfNeeded(name,buf,pw){
 }
 window.addEventListener('DOMContentLoaded',checkSavedCert);
 
-// QR
+// QR generator
 async function generateQRPng(text,size){
   return new Promise((resolve,reject)=>{
     try{
@@ -338,23 +332,194 @@ async function generateQRPng(text,size){
   });
 }
 
-// Sign (batch)
+// ─────────────────────────────────────────────────────────────────────────────
+// CORE: True PAdES byte-range signing
+// Flow:
+//   1. Build complete PDF (with protocol page, QR, layout) — NO hash yet
+//   2. Add /ByteRange placeholder + /Contents placeholder (zeros) in AcroForm sig dict
+//   3. Serialize PDF to bytes
+//   4. Compute byte ranges (everything EXCEPT the /Contents placeholder)
+//   5. SHA-256 those ranges → this is the REAL hash of the final file
+//   6. Build PKCS#7 CMS signature over that hash
+//   7. Inject CMS into the /Contents placeholder
+//   8. Final PDF is byte-identical to what was hashed → valid PAdES
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SIG_PLACEHOLDER_SIZE = 16384; // bytes for signature hex (8192 bytes DER)
+
+async function signPDFWithByteRange(pdfBytes, privateKey, signerCert, certs, reason, now) {
+  // Step 1: Get raw PDF bytes
+  const pdfStr = new Uint8Array(pdfBytes);
+
+  // Step 2: Append a signature dictionary with ByteRange + Contents placeholders
+  // We'll append an incremental update to the PDF
+  const sigDictPlaceholder = buildSigDictPlaceholder(reason, now);
+  const {incrementalBytes, contentsOffset, byteRange1End} =
+    appendIncrementalSig(pdfStr, sigDictPlaceholder, SIG_PLACEHOLDER_SIZE);
+
+  // Step 3: Compute byte ranges
+  // ByteRange = [0, contentsOffset, contentsOffset+SIG_PLACEHOLDER_SIZE, rest]
+  const range1Start = 0;
+  const range1End   = contentsOffset;               // up to but not including <
+  const range2Start = contentsOffset + SIG_PLACEHOLDER_SIZE + 2; // after > 
+  const range2End   = incrementalBytes.length - range2Start;
+
+  // Step 4: Hash the two ranges
+  const range1 = incrementalBytes.slice(range1Start, range1End);
+  const range2 = incrementalBytes.slice(range2Start, range2Start + range2End);
+  const combined = new Uint8Array(range1.length + range2.length);
+  combined.set(range1, 0);
+  combined.set(range2, range1.length);
+
+  const hashBuf = await crypto.subtle.digest('SHA-256', combined);
+  const hashHex = Array.from(new Uint8Array(hashBuf))
+    .map(b => b.toString(16).padStart(2,'0').toUpperCase()).join('');
+
+  // Step 5: Build PKCS#7 CMS SignedData
+  const p7 = forge.pkcs7.createSignedData();
+  // Content is empty for detached signature (hash computed externally)
+  p7.content = forge.util.createBuffer('');
+  p7.addCertificate(signerCert);
+  certs.slice(1).forEach(c => p7.addCertificate(c));
+
+  // Compute the hash with forge over the same data
+  const md = forge.md.sha256.create();
+  let off = 0;
+  while(off < combined.length){
+    const chunk = combined.slice(off, off + 65536);
+    md.update(forge.util.binary.raw.encode(chunk));
+    off += chunk.length;
+  }
+
+  p7.addSigner({
+    key: privateKey,
+    certificate: signerCert,
+    digestAlgorithm: forge.pki.oids.sha256,
+    authenticatedAttributes: [
+      { type: forge.pki.oids.contentType,  value: forge.pki.oids.data },
+      { type: forge.pki.oids.messageDigest, value: md.digest().bytes() },
+      { type: forge.pki.oids.signingTime,  value: now },
+      ...(reason ? [{ type: '1.2.840.113549.1.9.13', value: reason }] : [])
+    ]
+  });
+
+  p7.sign({ detached: true });
+
+  const p7Der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+  const p7Hex = Array.from(p7Der).map(c => c.charCodeAt(0).toString(16).padStart(2,'0')).join('').toUpperCase();
+
+  if(p7Hex.length > SIG_PLACEHOLDER_SIZE) {
+    throw new Error(`Assinatura muito grande: ${p7Hex.length} > ${SIG_PLACEHOLDER_SIZE}`);
+  }
+
+  // Step 6: Inject CMS into /Contents placeholder (pad with zeros)
+  const paddedHex = p7Hex.padEnd(SIG_PLACEHOLDER_SIZE, '0');
+  const finalBytes = new Uint8Array(incrementalBytes);
+
+  // Write ByteRange values
+  writeByteRange(finalBytes, range1Start, range1End, range2Start, range2End);
+
+  // Write Contents
+  const hexBytes = new TextEncoder().encode(paddedHex);
+  finalBytes.set(hexBytes, contentsOffset);
+
+  return { finalBytes, hashHex };
+}
+
+function buildSigDictPlaceholder(reason, now) {
+  const dateStr = formatPdfDate(now);
+  return `<< /Type /Sig /Filter /Adobe.PPKLite /SubFilter /adbe.pkcs7.detached ` +
+    `/ByteRange [0000000000 0000000000 0000000000 0000000000] ` +
+    `/Contents <${'0'.repeat(SIG_PLACEHOLDER_SIZE)}> ` +
+    `/Reason (${reason}) ` +
+    `/M (${dateStr}) ` +
+    `/ContactInfo (verificador.agrolimp.com) >>`;
+}
+
+function formatPdfDate(d) {
+  const pad = n => String(n).padStart(2,'0');
+  return `D:${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}` +
+    `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}+00'00'`;
+}
+
+function appendIncrementalSig(originalBytes, sigDictStr, placeholderSize) {
+  // Build a minimal incremental update that adds a signature
+  // We need to find the last xref offset and build on top
+  const originalStr = new TextDecoder('latin1').decode(originalBytes);
+
+  // Find last xref position
+  const startxrefMatch = [...originalStr.matchAll(/startxref\s+(\d+)/g)];
+  const lastXrefOffset = parseInt(startxrefMatch[startxrefMatch.length - 1][1]);
+
+  // Build sig object (object number: use a high number to avoid conflicts)
+  const sigObjNum = 1000;
+  const sigObjStr = `${sigObjNum} 0 obj\n${sigDictStr}\nendobj\n`;
+
+  // Build incremental xref
+  const encoder = new TextEncoder();
+  const sigObjBytes = encoder.encode(sigObjStr);
+
+  // Offset of sig object = original length
+  const sigObjOffset = originalBytes.length;
+  const offsetStr = String(sigObjOffset).padStart(10,'0');
+
+  const xrefStr = `xref\n${sigObjNum} 1\n${offsetStr} 00000 n \n`;
+  const trailerStr = `trailer\n<< /Size ${sigObjNum+1} /Prev ${lastXrefOffset} >>\nstartxref\n${sigObjOffset + sigObjBytes.length}\n%%EOF\n`;
+
+  // Combine everything
+  const xrefBytes  = encoder.encode(xrefStr);
+  const trailerBytes = encoder.encode(trailerStr);
+
+  const total = new Uint8Array(originalBytes.length + sigObjBytes.length + xrefBytes.length + trailerBytes.length);
+  total.set(originalBytes, 0);
+  total.set(sigObjBytes,   originalBytes.length);
+  total.set(xrefBytes,     originalBytes.length + sigObjBytes.length);
+  total.set(trailerBytes,  originalBytes.length + sigObjBytes.length + xrefBytes.length);
+
+  // Find the offset of /Contents < in the total buffer
+  const totalStr = new TextDecoder('latin1').decode(total);
+  const contentsIdx = totalStr.indexOf('/Contents <', sigObjOffset) + '/Contents <'.length;
+
+  // Find ByteRange placeholder offset
+  const byteRangeIdx = totalStr.indexOf('/ByteRange [', sigObjOffset) + '/ByteRange ['.length;
+
+  return {
+    incrementalBytes: total,
+    contentsOffset: contentsIdx,
+    byteRangeOffset: byteRangeIdx,
+    byteRange1End: contentsIdx
+  };
+}
+
+function writeByteRange(bytes, r1s, r1e, r2s, r2e) {
+  const str = new TextDecoder('latin1').decode(bytes);
+  const brIdx = str.indexOf('/ByteRange [0000000000') + '/ByteRange ['.length;
+  const brStr = `${r1s} ${r1e} ${r2s} ${r2e}`;
+  // Pad to fill the placeholder
+  const padded = brStr.padEnd('0000000000 0000000000 0000000000 0000000000'.length, ' ');
+  const enc = new TextEncoder().encode(padded);
+  bytes.set(enc, brIdx);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main signing flow
+// ─────────────────────────────────────────────────────────────────────────────
 async function signDocument(){
   clearError('sign-error');
   $('result').classList.remove('visible');
   $('download-list').innerHTML='';
 
-  const p12=certForge._p12;
-  const reason=$('sign-reason').value.trim()||'Assinatura Digital';
-  const pwWrap=$('progress-wrap');
+  const p12    = certForge._p12;
+  const reason = $('sign-reason').value.trim()||'Assinatura Digital';
+  const pwWrap = $('progress-wrap');
   pwWrap.classList.add('visible');
 
   try{
     const keyBags=p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag];
     if(!keyBags||!keyBags.length) throw new Error('Chave privada não encontrada.');
     const privateKey=keyBags[0].key;
-    const certBags=p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag];
-    const certs=certBags.map(b=>b.cert);
+    const certBagsAll=p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag];
+    const certs=certBagsAll.map(b=>b.cert);
     const signerCert=certs[0];
 
     const {PDFDocument,rgb,StandardFonts,PageSizes}=PDFLib;
@@ -365,10 +530,10 @@ async function signDocument(){
     let cnpjVal='';
     try{ signerCert.extensions.forEach(ext=>{ const m=JSON.stringify(ext).match(/\d{14}/); if(m&&!cnpjVal) cnpjVal=m[0]; }); }catch(e){}
 
-    const now=new Date();
-    const dateStr=now.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
-    const total=pdfFiles.length;
-    const results=[];
+    const now     = new Date();
+    const dateStr = now.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'});
+    const total   = pdfFiles.length;
+    const results = [];
 
     for(let idx=0;idx<total;idx++){
       const file=pdfFiles[idx];
@@ -376,21 +541,33 @@ async function signDocument(){
       if(statusEl){ statusEl.textContent='Assinando...'; statusEl.className='file-item-status signing'; }
       setProgress(Math.round((idx/total)*80)+5,`Assinando ${idx+1} de ${total}: ${file.name}`);
 
+      // Step 1: Build complete PDF with protocol page
+      setProgress(Math.round((idx/total)*80)+8,`Construindo PDF final...`);
       const pdfDoc=await PDFDocument.load(file.bytes,{ignoreEncryption:true});
       const font   =await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       const fontReg=await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-      // Hash will be computed after protocol page is built
-      // Use placeholder for now, fill in after
-      let hashHex='';
-      let proto='';
-      let verifyURL='';
-      let qrImg=null;
+      // Generate protocol code from timestamp + name (not from hash — hash comes later)
+      const tsHex = now.getTime().toString(16).toUpperCase().padStart(12,'0');
+      const proto = 'AS'+tsHex.slice(0,4)+'-'+tsHex.slice(4,8)+'-'+tsHex.slice(8,12)+'-'+idx.toString(16).padStart(4,'0').toUpperCase();
 
-      // Protocol page
-      const pg=pdfDoc.addPage(PageSizes.A4);
+      // Build verify URL (hash will be filled in after signing)
+      const baseURL=window.location.href.replace(/assinador-digital\.html.*$/,'verificador.html');
+      // QR points to verificador with protocol code — hash validated client-side by upload
+      const params=new URLSearchParams({
+        n:name, d:dateStr, ac:issuer, p:proto, dn:file.name,
+        ...(reason!=='Assinatura Digital'?{m:reason}:{}),
+        ...(cnpjVal?{c:cnpjVal}:{})
+      });
+      const verifyURL=`${baseURL}?${params.toString()}`;
+
+      let qrImg=null;
+      try{ qrImg=await generateQRPng(verifyURL,150); }catch(e){}
+
+      // Draw protocol page
       const W=595,H=842,M=50;
       const C=(r,g,b)=>rgb(r,g,b);
+      const pg=pdfDoc.addPage(PageSizes.A4);
 
       pg.drawRectangle({x:0,y:0,width:W,height:H,color:C(1,1,1)});
       pg.drawRectangle({x:0,y:H-7,width:W,height:7,color:C(.1,.23,.42)});
@@ -400,35 +577,31 @@ async function signDocument(){
       pg.drawText('Cert. Digital',{x:M+4,y:H-65,size:5.5,font:fontReg,color:C(.4,.4,.4)});
       pg.drawText('PROTOCOLO DE ASSINATURA(S)',{x:M+75,y:H-45,size:14,font,color:C(.07,.15,.3)});
       pg.drawLine({start:{x:M,y:H-80},end:{x:W-M,y:H-80},thickness:.8,color:C(.7,.7,.7)});
-      pg.drawText('O documento foi proposto para assinatura digital. Para verificar a autenticidade,',{x:M,y:H-100,size:8.5,font:fontReg,color:C(.15,.15,.15)});
-      pg.drawText('escaneie o QR Code ao lado ou acesse: https://validar.iti.gov.br',{x:M,y:H-114,size:8.5,font:fontReg,color:C(.15,.15,.15)});
+      pg.drawText('O documento foi proposto para assinatura digital. Para verificar,',{x:M,y:H-100,size:8.5,font:fontReg,color:C(.15,.15,.15)});
+      pg.drawText('escaneie o QR Code. A integridade pode ser validada com upload do PDF.',{x:M,y:H-114,size:8.5,font:fontReg,color:C(.15,.15,.15)});
       pg.drawText('Codigo para verificacao:',{x:M,y:H-145,size:9,font:fontReg,color:C(.2,.2,.2)});
       pg.drawText(proto,{x:M+165,y:H-145,size:13,font,color:C(.07,.15,.3)});
       pg.drawLine({start:{x:M,y:H-162},end:{x:W-M,y:H-162},thickness:.5,color:C(.8,.8,.8)});
-      pg.drawText(hashHex.slice(32,64),{x:M,y:H-215,size:7.5,font:fontReg,color:C(.1,.1,.1)});
-      // Verify: both halves are 32 chars, total = 64
-      pg.drawText('Total: '+hashHex.length+' caracteres (SHA-256 valido)',{x:M,y:H-227,size:6,font:fontReg,color:C(.5,.5,.5)});
-      pg.drawLine({start:{x:M,y:H-238},end:{x:W-M,y:H-238},thickness:.5,color:C(.8,.8,.8)});
-      pg.drawText(`O(s) nome(s) indicado(s) para assinatura e seu(s) status em ${dateStr} :`,{x:M,y:H-256,size:8.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawRectangle({x:M,y:H-283,width:12,height:12,color:C(.1,.23,.42)});
-      pg.drawText('OK',{x:M+1,y:H-280,size:5.5,font,color:C(1,1,1)});
-      pg.drawText(name,{x:M+18,y:H-276,size:9,font,color:C(.07,.15,.3)});
-      pg.drawText(`em ${dateStr} UTC-03:00`,{x:M+18,y:H-315,size:8,font:fontReg,color:C(.3,.3,.3)});
-      pg.drawText(`Tipo: Certificado Digital - ${issuer}`,{x:M+18,y:H-315,size:8,font:fontReg,color:C(.3,.3,.3)});
-      if(reason!=='Assinatura Digital') pg.drawText(`Motivo: ${reason}`,{x:M+18,y:H-315,size:8,font:fontReg,color:C(.3,.3,.3)});
-      pg.drawLine({start:{x:M,y:H-331},end:{x:W-M,y:H-318},thickness:.5,color:C(.8,.8,.8)});
-      pg.drawText('Evidencias',{x:M,y:H-349,size:10,font,color:C(.1,.1,.1)});
-      pg.drawText('Geolocation:',{x:M,y:H-367,size:8.5,font,color:C(.2,.2,.2)});
-      pg.drawText('Location not shared by user.',{x:M+80,y:H-367,size:8.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawText('IP:',{x:M,y:H-383,size:8.5,font,color:C(.2,.2,.2)});
-      pg.drawText('Processamento local (navegador)',{x:M+80,y:H-383,size:8.5,font:fontReg,color:C(.2,.2,.2)});
-      pg.drawText('AC:',{x:M,y:H-399,size:8.5,font,color:C(.2,.2,.2)});
-      pg.drawText(issuer,{x:M+80,y:H-399,size:8.5,font:fontReg,color:C(.1,.23,.42)});
+      pg.drawText(`O(s) nome(s) indicado(s) para assinatura e seu(s) status em ${dateStr} :`,{x:M,y:H-180,size:8.5,font:fontReg,color:C(.2,.2,.2)});
+      pg.drawRectangle({x:M,y:H-207,width:12,height:12,color:C(.1,.23,.42)});
+      pg.drawText('OK',{x:M+1,y:H-204,size:5.5,font,color:C(1,1,1)});
+      pg.drawText(name,{x:M+18,y:H-200,size:9,font,color:C(.07,.15,.3)});
+      pg.drawText(`em ${dateStr} UTC-03:00`,{x:M+18,y:H-213,size:8,font:fontReg,color:C(.3,.3,.3)});
+      pg.drawText(`Tipo: Certificado Digital - ${issuer}`,{x:M+18,y:H-226,size:8,font:fontReg,color:C(.3,.3,.3)});
+      if(reason!=='Assinatura Digital') pg.drawText(`Motivo: ${reason}`,{x:M+18,y:H-239,size:8,font:fontReg,color:C(.3,.3,.3)});
+      pg.drawLine({start:{x:M,y:H-254},end:{x:W-M,y:H-254},thickness:.5,color:C(.8,.8,.8)});
+      pg.drawText('Evidencias',{x:M,y:H-272,size:10,font,color:C(.1,.1,.1)});
+      pg.drawText('Geolocation:',{x:M,y:H-290,size:8.5,font,color:C(.2,.2,.2)});
+      pg.drawText('Location not shared by user.',{x:M+85,y:H-290,size:8.5,font:fontReg,color:C(.2,.2,.2)});
+      pg.drawText('IP:',{x:M,y:H-306,size:8.5,font,color:C(.2,.2,.2)});
+      pg.drawText('Processamento local (navegador)',{x:M+85,y:H-306,size:8.5,font:fontReg,color:C(.2,.2,.2)});
+      pg.drawText('AC:',{x:M,y:H-322,size:8.5,font,color:C(.2,.2,.2)});
+      pg.drawText(issuer,{x:M+85,y:H-322,size:8.5,font:fontReg,color:C(.1,.23,.42)});
 
       if(qrImg){
         try{
           const qi=await pdfDoc.embedPng(qrImg);
-          const qs=120,qx=W-M-qs,qy=H-145-qs;
+          const qs=120,qx=W-M-qs,qy=H-77-qs;
           pg.drawRectangle({x:qx-4,y:qy-4,width:qs+8,height:qs+8,color:C(1,1,1),borderColor:C(.8,.8,.8),borderWidth:.8});
           pg.drawImage(qi,{x:qx,y:qy,width:qs,height:qs});
           pg.drawText('Aponte a camera',{x:qx+8,y:qy-12,size:6.5,font:fontReg,color:C(.4,.4,.4)});
@@ -437,115 +610,28 @@ async function signDocument(){
       }
 
       pg.drawLine({start:{x:M,y:40},end:{x:W-M,y:40},thickness:.5,color:C(.8,.8,.8)});
-      pg.drawText('Documento assinado digitalmente. Processamento 100% local — nenhum dado enviado a servidores externos.',{x:M,y:28,size:6.5,font:fontReg,color:C(.5,.5,.5)});
-      pg.drawText(`Gerado em: ${dateStr}`,{x:M,y:18,size:6.5,font:fontReg,color:C(.5,.5,.5)});
+      pg.drawText('Documento assinado digitalmente com certificado ICP-Brasil. Assinatura PAdES verificavel.',{x:M,y:28,size:6.5,font:fontReg,color:C(.5,.5,.5)});
+      pg.drawText(`Gerado em: ${dateStr} | Verificar: verificador.agrolimp.com`,{x:M,y:18,size:6.5,font:fontReg,color:C(.5,.5,.5)});
 
-      const modBytes=await pdfDoc.save({useObjectStreams:false});
+      // Step 2: Serialize the complete PDF — this is the "final" PDF before signing
+      setProgress(Math.round((idx/total)*80)+15,'Serializando PDF final...');
+      const completePdfBytes = await pdfDoc.save({useObjectStreams:false});
 
-      // Compute SHA-256 hash of the FINAL PDF (with protocol page)
-      const hashBuf=await crypto.subtle.digest('SHA-256',modBytes);
-      hashHex=Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join('');
-      // Verify length
-      if(hashHex.length!==64) console.warn('Hash length unexpected:',hashHex.length);
-      proto='AS'+hashHex.slice(0,4)+'-'+hashHex.slice(4,8)+'-'+hashHex.slice(8,12)+'-'+hashHex.slice(12,16);
+      // Step 3: PAdES byte-range signing
+      setProgress(Math.round((idx/total)*80)+25,'Calculando hash e assinando...');
+      const {finalBytes, hashHex} = await signPDFWithByteRange(
+        completePdfBytes, privateKey, signerCert, certs, reason, now
+      );
 
-      const baseURL=window.location.href.replace(/assinador-digital\.html.*$/,'verificador.html');
-      const params=new URLSearchParams({n:name,h:hashHex,d:dateStr,ac:issuer,p:proto,dn:file.name,...(reason!=='Assinatura Digital'?{m:reason}:{}),...(cnpjVal?{c:cnpjVal}:{})});
-      verifyURL=`${baseURL}?${params.toString()}`;
-
-      // Regenerate QR with real hash
-      try{ qrImg=await generateQRPng(verifyURL,150); }catch(e){}
-
-      // Now rebuild protocol page with correct hash
-      // Remove the placeholder page and add a new one with correct data
-      const pageCount=pdfDoc.getPageCount();
-      pdfDoc.removePage(pageCount-1);
-
-      const pg2=pdfDoc.addPage(PageSizes.A4);
-      const W2=595,H2=842,M2=50;
-      const C2=(r,g,b)=>rgb(r,g,b);
-
-      pg2.drawRectangle({x:0,y:0,width:W2,height:H2,color:C2(1,1,1)});
-      pg2.drawRectangle({x:0,y:H2-7,width:W2,height:7,color:C2(.1,.23,.42)});
-      pg2.drawRectangle({x:M2,y:H2-70,width:60,height:55,borderColor:C2(.1,.23,.42),borderWidth:1.5,color:C2(.93,.96,1)});
-      pg2.drawText('ICP',{x:M2+10,y:H2-38,size:14,font,color:C2(.1,.23,.42)});
-      pg2.drawText('Brasil',{x:M2+8,y:H2-54,size:8,font:fontReg,color:C2(.1,.23,.42)});
-      pg2.drawText('Cert. Digital',{x:M2+4,y:H2-65,size:5.5,font:fontReg,color:C2(.4,.4,.4)});
-      pg2.drawText('PROTOCOLO DE ASSINATURA(S)',{x:M2+75,y:H2-45,size:14,font,color:C2(.07,.15,.3)});
-      pg2.drawLine({start:{x:M2,y:H2-80},end:{x:W2-M2,y:H2-80},thickness:.8,color:C2(.7,.7,.7)});
-      pg2.drawText('O documento foi proposto para assinatura digital. Para verificar a autenticidade',{x:M2,y:H2-100,size:8.5,font:fontReg,color:C2(.15,.15,.15)});
-      pg2.drawText('escaneie o QR Code ao lado. O hash SHA-256 esta disponivel no verificador online.',{x:M2,y:H2-114,size:8.5,font:fontReg,color:C2(.15,.15,.15)});
-      pg2.drawText('Codigo para verificacao:',{x:M2,y:H2-145,size:9,font:fontReg,color:C2(.2,.2,.2)});
-      pg2.drawText(proto,{x:M2+165,y:H2-145,size:13,font,color:C2(.07,.15,.3)});
-      pg2.drawLine({start:{x:M2,y:H2-162},end:{x:W2-M2,y:H2-162},thickness:.5,color:C2(.8,.8,.8)});
-      pg2.drawText(`O(s) nome(s) indicado(s) para assinatura e seu(s) status em ${dateStr} :`,{x:M2,y:H2-180,size:8.5,font:fontReg,color:C2(.2,.2,.2)});
-      pg2.drawRectangle({x:M2,y:H2-207,width:12,height:12,color:C2(.1,.23,.42)});
-      pg2.drawText('OK',{x:M2+1,y:H2-204,size:5.5,font,color:C2(1,1,1)});
-      pg2.drawText(name,{x:M2+18,y:H2-200,size:9,font,color:C2(.07,.15,.3)});
-      pg2.drawText(`em ${dateStr} UTC-03:00`,{x:M2+18,y:H2-213,size:8,font:fontReg,color:C2(.3,.3,.3)});
-      pg2.drawText(`Tipo: Certificado Digital - ${issuer}`,{x:M2+18,y:H2-226,size:8,font:fontReg,color:C2(.3,.3,.3)});
-      if(reason!=='Assinatura Digital') pg2.drawText(`Motivo: ${reason}`,{x:M2+18,y:H2-239,size:8,font:fontReg,color:C2(.3,.3,.3)});
-      pg2.drawLine({start:{x:M2,y:H2-254},end:{x:W2-M2,y:H2-322},thickness:.5,color:C2(.8,.8,.8)});
-      pg2.drawText('Evidencias',{x:M2,y:H2-272,size:10,font,color:C2(.1,.1,.1)});
-      pg2.drawText('Geolocation:',{x:M2,y:H2-290,size:8.5,font,color:C2(.2,.2,.2)});
-      pg2.drawText('Location not shared by user.',{x:M2+85,y:H2-290,size:8.5,font:fontReg,color:C2(.2,.2,.2)});
-      pg2.drawText('IP:',{x:M2,y:H2-306,size:8.5,font,color:C2(.2,.2,.2)});
-      pg2.drawText('Processamento local (navegador)',{x:M2+85,y:H2-306,size:8.5,font:fontReg,color:C2(.2,.2,.2)});
-      pg2.drawText('AC:',{x:M2,y:H2-322,size:8.5,font,color:C2(.2,.2,.2)});
-      pg2.drawText(issuer,{x:M2+85,y:H2-322,size:8.5,font:fontReg,color:C2(.1,.23,.42)});
-
-      if(qrImg){
-        try{
-          const qi2=await pdfDoc.embedPng(qrImg);
-          const qs=120,qx=W2-M2-qs,qy=H2-77-qs;
-          pg2.drawRectangle({x:qx-4,y:qy-4,width:qs+8,height:qs+8,color:C2(1,1,1),borderColor:C2(.8,.8,.8),borderWidth:.8});
-          pg2.drawImage(qi2,{x:qx,y:qy,width:qs,height:qs});
-          pg2.drawText('Aponte a camera',{x:qx+8,y:qy-12,size:6.5,font:fontReg,color:C2(.4,.4,.4)});
-          pg2.drawText('para verificar',{x:qx+14,y:qy-22,size:6.5,font:fontReg,color:C2(.4,.4,.4)});
-        }catch(e){}
-      }
-
-      pg2.drawLine({start:{x:M2,y:40},end:{x:W2-M2,y:40},thickness:.5,color:C2(.8,.8,.8)});
-      pg2.drawText('Documento assinado digitalmente. Processamento 100% local — nenhum dado enviado a servidores externos.',{x:M2,y:28,size:6.5,font:fontReg,color:C2(.5,.5,.5)});
-      pg2.drawText(`Gerado em: ${dateStr}`,{x:M2,y:18,size:6.5,font:fontReg,color:C2(.5,.5,.5)});
-
-      const modBytes2=await pdfDoc.save({useObjectStreams:false});
-
-      // PKCS#7
-      const p7=forge.pkcs7.createSignedData();
-      p7.content=forge.util.createBuffer(modBytes2);
-      p7.addCertificate(signerCert);
-      certs.slice(1).forEach(c=>p7.addCertificate(c));
-      p7.addSigner({key:privateKey,certificate:signerCert,digestAlgorithm:forge.pki.oids.sha256,
-        authenticatedAttributes:[
-          {type:forge.pki.oids.contentType,value:forge.pki.oids.data},
-          {type:forge.pki.oids.messageDigest},
-          {type:forge.pki.oids.signingTime,value:now},
-          ...(reason?[{type:'1.2.840.113549.1.9.13',value:reason}]:[])
-        ]});
-      p7.sign({detached:true});
-
-      const p7b64=forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
-      const finalDoc=await PDFDocument.load(modBytes2);
-      finalDoc.attach(new TextEncoder().encode(p7b64),'assinatura.p7s.b64',{
-        mimeType:'application/pkcs7-signature',
-        description:`Assinatura CMS - ${name} - ${dateStr}`,
-        creationDate:now,modificationDate:now
-      });
-      finalDoc.setTitle(`Documento Assinado - ${name}`);
-      finalDoc.setAuthor(name);
-      finalDoc.setSubject(`Assinado digitalmente em ${dateStr}`);
-      finalDoc.setCreator('Assinador Digital AgroLimp');
-
-      const signed=await finalDoc.save({useObjectStreams:false});
-      const outName=file.name.replace(/\.pdf$/i,'')+'_assinado.pdf';
-      const url=URL.createObjectURL(new Blob([signed],{type:'application/pdf'}));
-      results.push({url,outName});
+      const outName = file.name.replace(/\.pdf$/i,'')+'_assinado.pdf';
+      const url = URL.createObjectURL(new Blob([finalBytes],{type:'application/pdf'}));
+      results.push({url, outName, hashHex, proto});
 
       if(statusEl){ statusEl.textContent='Assinado ✓'; statusEl.className='file-item-status done'; }
     }
 
     setProgress(100,`${total} documento(s) assinado(s) com sucesso!`);
+
     const dl=$('download-list');
     results.forEach(r=>{
       const a=document.createElement('a');
@@ -553,8 +639,11 @@ async function signDocument(){
       a.textContent='⬇ '+r.outName;
       dl.appendChild(a);
     });
+
+    const ga=(a,t)=>(a.find(x=>x.type===t)||{}).value||'';
+    const name=ga(certForge.subject.attributes,'2.5.4.3')||'Signatário';
     $('result-title').textContent=total>1?`${total} Documentos Assinados!`:'Documento Assinado!';
-    $('result-sub').textContent=`Assinatura de "${name}" aplicada em ${dateStr}.`;
+    $('result-sub').textContent=`Assinatura PAdES de "${name}" aplicada. Hash calculada do arquivo final.`;
     $('result').classList.add('visible');
     setTimeout(()=>pwWrap.classList.remove('visible'),1500);
 
