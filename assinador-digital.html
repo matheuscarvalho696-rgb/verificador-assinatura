@@ -380,16 +380,12 @@ async function signDocument(){
       const font   =await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       const fontReg=await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-      const hashBuf=await crypto.subtle.digest('SHA-256',file.bytes);
-      const hashHex=Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join('');
-      const proto='AS'+hashHex.slice(0,4)+'-'+hashHex.slice(4,8)+'-'+hashHex.slice(8,12)+'-'+hashHex.slice(12,16);
-
-      const baseURL=window.location.href.replace(/assinador-digital\.html.*$/,'verificador.html');
-      const params=new URLSearchParams({n:name,h:hashHex,d:dateStr,ac:issuer,p:proto,dn:file.name,...(reason!=='Assinatura Digital'?{m:reason}:{}),...(cnpjVal?{c:cnpjVal}:{})});
-      const verifyURL=`${baseURL}?${params.toString()}`;
-
+      // Hash will be computed after protocol page is built
+      // Use placeholder for now, fill in after
+      let hashHex='';
+      let proto='';
+      let verifyURL='';
       let qrImg=null;
-      try{ qrImg=await generateQRPng(verifyURL,150); }catch(e){}
 
       // Protocol page
       const pg=pdfDoc.addPage(PageSizes.A4);
@@ -449,9 +445,83 @@ async function signDocument(){
 
       const modBytes=await pdfDoc.save({useObjectStreams:false});
 
+      // Compute SHA-256 hash of the FINAL PDF (with protocol page)
+      const hashBuf=await crypto.subtle.digest('SHA-256',modBytes);
+      hashHex=Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join('');
+      // Verify length
+      if(hashHex.length!==64) console.warn('Hash length unexpected:',hashHex.length);
+      proto='AS'+hashHex.slice(0,4)+'-'+hashHex.slice(4,8)+'-'+hashHex.slice(8,12)+'-'+hashHex.slice(12,16);
+
+      const baseURL=window.location.href.replace(/assinador-digital\.html.*$/,'verificador.html');
+      const params=new URLSearchParams({n:name,h:hashHex,d:dateStr,ac:issuer,p:proto,dn:file.name,...(reason!=='Assinatura Digital'?{m:reason}:{}),...(cnpjVal?{c:cnpjVal}:{})});
+      verifyURL=`${baseURL}?${params.toString()}`;
+
+      // Regenerate QR with real hash
+      try{ qrImg=await generateQRPng(verifyURL,150); }catch(e){}
+
+      // Now rebuild protocol page with correct hash
+      // Remove the placeholder page and add a new one with correct data
+      const pageCount=pdfDoc.getPageCount();
+      pdfDoc.removePage(pageCount-1);
+
+      const pg2=pdfDoc.addPage(PageSizes.A4);
+      const W2=595,H2=842,M2=50;
+      const C2=(r,g,b)=>rgb(r,g,b);
+
+      pg2.drawRectangle({x:0,y:0,width:W2,height:H2,color:C2(1,1,1)});
+      pg2.drawRectangle({x:0,y:H2-7,width:W2,height:7,color:C2(.1,.23,.42)});
+      pg2.drawRectangle({x:M2,y:H2-70,width:60,height:55,borderColor:C2(.1,.23,.42),borderWidth:1.5,color:C2(.93,.96,1)});
+      pg2.drawText('ICP',{x:M2+10,y:H2-38,size:14,font,color:C2(.1,.23,.42)});
+      pg2.drawText('Brasil',{x:M2+8,y:H2-54,size:8,font:fontReg,color:C2(.1,.23,.42)});
+      pg2.drawText('Cert. Digital',{x:M2+4,y:H2-65,size:5.5,font:fontReg,color:C2(.4,.4,.4)});
+      pg2.drawText('PROTOCOLO DE ASSINATURA(S)',{x:M2+75,y:H2-45,size:14,font,color:C2(.07,.15,.3)});
+      pg2.drawLine({start:{x:M2,y:H2-80},end:{x:W2-M2,y:H2-80},thickness:.8,color:C2(.7,.7,.7)});
+      pg2.drawText('O documento foi proposto para assinatura digital. Para verificar a autenticidade,',{x:M2,y:H2-100,size:8.5,font:fontReg,color:C2(.15,.15,.15)});
+      pg2.drawText('escaneie o QR Code ao lado ou acesse: https://validar.iti.gov.br',{x:M2,y:H2-114,size:8.5,font:fontReg,color:C2(.15,.15,.15)});
+      pg2.drawText('Codigo para verificacao:',{x:M2,y:H2-145,size:9,font:fontReg,color:C2(.2,.2,.2)});
+      pg2.drawText(proto,{x:M2+165,y:H2-145,size:13,font,color:C2(.07,.15,.3)});
+      pg2.drawLine({start:{x:M2,y:H2-162},end:{x:W2-M2,y:H2-162},thickness:.5,color:C2(.8,.8,.8)});
+      pg2.drawText('Hash do Documento (SHA-256)',{x:M2,y:H2-180,size:9,font,color:C2(.1,.1,.1)});
+      pg2.drawText('(64 caracteres — copie as duas linhas juntas sem espacos)',{x:M2,y:H2-191,size:6,font:fontReg,color:C2(.5,.5,.5)});
+      pg2.drawText(hashHex.slice(0,32),{x:M2,y:H2-203,size:8,font:fontReg,color:C2(.05,.1,.3)});
+      pg2.drawText(hashHex.slice(32,64),{x:M2,y:H2-216,size:8,font:fontReg,color:C2(.05,.1,.3)});
+      pg2.drawLine({start:{x:M2,y:H2-230},end:{x:W2-M2,y:H2-230},thickness:.5,color:C2(.8,.8,.8)});
+      pg2.drawText(`O(s) nome(s) indicado(s) para assinatura e seu(s) status em ${dateStr} :`,{x:M2,y:H2-248,size:8.5,font:fontReg,color:C2(.2,.2,.2)});
+      pg2.drawRectangle({x:M2,y:H2-275,width:12,height:12,color:C2(.1,.23,.42)});
+      pg2.drawText('OK',{x:M2+1,y:H2-272,size:5.5,font,color:C2(1,1,1)});
+      pg2.drawText(name,{x:M2+18,y:H2-268,size:9,font,color:C2(.07,.15,.3)});
+      pg2.drawText(`em ${dateStr} UTC-03:00`,{x:M2+18,y:H2-281,size:8,font:fontReg,color:C2(.3,.3,.3)});
+      pg2.drawText(`Tipo: Certificado Digital - ${issuer}`,{x:M2+18,y:H2-294,size:8,font:fontReg,color:C2(.3,.3,.3)});
+      if(reason!=='Assinatura Digital') pg2.drawText(`Motivo: ${reason}`,{x:M2+18,y:H2-307,size:8,font:fontReg,color:C2(.3,.3,.3)});
+      pg2.drawLine({start:{x:M2,y:H2-322},end:{x:W2-M2,y:H2-322},thickness:.5,color:C2(.8,.8,.8)});
+      pg2.drawText('Evidencias',{x:M2,y:H2-340,size:10,font,color:C2(.1,.1,.1)});
+      pg2.drawText('Geolocation:',{x:M2,y:H2-358,size:8.5,font,color:C2(.2,.2,.2)});
+      pg2.drawText('Location not shared by user.',{x:M2+85,y:H2-358,size:8.5,font:fontReg,color:C2(.2,.2,.2)});
+      pg2.drawText('IP:',{x:M2,y:H2-374,size:8.5,font,color:C2(.2,.2,.2)});
+      pg2.drawText('Processamento local (navegador)',{x:M2+85,y:H2-374,size:8.5,font:fontReg,color:C2(.2,.2,.2)});
+      pg2.drawText('AC:',{x:M2,y:H2-390,size:8.5,font,color:C2(.2,.2,.2)});
+      pg2.drawText(issuer,{x:M2+85,y:H2-390,size:8.5,font:fontReg,color:C2(.1,.23,.42)});
+
+      if(qrImg){
+        try{
+          const qi2=await pdfDoc.embedPng(qrImg);
+          const qs=120,qx=W2-M2-qs,qy=H2-145-qs;
+          pg2.drawRectangle({x:qx-4,y:qy-4,width:qs+8,height:qs+8,color:C2(1,1,1),borderColor:C2(.8,.8,.8),borderWidth:.8});
+          pg2.drawImage(qi2,{x:qx,y:qy,width:qs,height:qs});
+          pg2.drawText('Aponte a camera',{x:qx+8,y:qy-12,size:6.5,font:fontReg,color:C2(.4,.4,.4)});
+          pg2.drawText('para verificar',{x:qx+14,y:qy-22,size:6.5,font:fontReg,color:C2(.4,.4,.4)});
+        }catch(e){}
+      }
+
+      pg2.drawLine({start:{x:M2,y:40},end:{x:W2-M2,y:40},thickness:.5,color:C2(.8,.8,.8)});
+      pg2.drawText('Documento assinado digitalmente. Processamento 100% local — nenhum dado enviado a servidores externos.',{x:M2,y:28,size:6.5,font:fontReg,color:C2(.5,.5,.5)});
+      pg2.drawText(`Gerado em: ${dateStr}`,{x:M2,y:18,size:6.5,font:fontReg,color:C2(.5,.5,.5)});
+
+      const modBytes2=await pdfDoc.save({useObjectStreams:false});
+
       // PKCS#7
       const p7=forge.pkcs7.createSignedData();
-      p7.content=forge.util.createBuffer(modBytes);
+      p7.content=forge.util.createBuffer(modBytes2);
       p7.addCertificate(signerCert);
       certs.slice(1).forEach(c=>p7.addCertificate(c));
       p7.addSigner({key:privateKey,certificate:signerCert,digestAlgorithm:forge.pki.oids.sha256,
@@ -464,7 +534,7 @@ async function signDocument(){
       p7.sign({detached:true});
 
       const p7b64=forge.util.encode64(forge.asn1.toDer(p7.toAsn1()).getBytes());
-      const finalDoc=await PDFDocument.load(modBytes);
+      const finalDoc=await PDFDocument.load(modBytes2);
       finalDoc.attach(new TextEncoder().encode(p7b64),'assinatura.p7s.b64',{
         mimeType:'application/pkcs7-signature',
         description:`Assinatura CMS - ${name} - ${dateStr}`,
